@@ -6,6 +6,9 @@ from typing import List,Union
 from scipy.signal import find_peaks
 from totalsegmentator.python_api import totalsegmentator
 from scipy import ndimage
+import tempfile
+import shutil
+import os
 
 def read_image(image_path:str)->sitk.Image:
     """
@@ -64,7 +67,7 @@ def save_image(image:sitk.Image, image_path:str,compression=True):
 #                         }
 #     pyplastimatch.convert(**convert_args_ct)
 
-def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[sitk.Image,sitk.Transform]:
+def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter,default_value = 0)->Union[sitk.Image,sitk.Transform]:
     """
     Perform rigid registration between a fixed image and a moving image using the given parameter file.
 
@@ -77,6 +80,9 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[si
     Tuple[sitk.Image, sitk.Transform]: A tuple containing the registered image and the inverse transform.
 
     """
+    temp_dir = tempfile.mkdtemp()
+    current_directory = os.getcwd()
+    os.chdir(temp_dir)
     
     # Perform registration based on parameter file
     elastixImageFilter = sitk.ElastixImageFilter()
@@ -86,6 +92,7 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[si
     elastixImageFilter.LogToConsoleOn()
     elastixImageFilter.LogToFileOff()
     elastixImageFilter.Execute()
+    elastixImageFilter.SetOutputDirectory(temp_dir)
 
     # convert to itk transform format
     transform = elastixImageFilter.GetTransformParameterMap(0)
@@ -104,21 +111,15 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[si
     ##invert transform to get MR registered to CT
     inverse_transform = transform_itk.GetInverse()
 
-    ## check if moving image is an mr or cbct
-    min_moving = np.amin(sitk.GetArrayFromImage(moving))
-    if min_moving <-200:
-        background = 0
-    else:
-        background = 0
-
     ##transform moving image
     resample = sitk.ResampleImageFilter()
     resample.SetReferenceImage(fixed)
     resample.SetTransform(inverse_transform)
     resample.SetInterpolator(sitk.sitkLinear)
-    resample.SetDefaultPixelValue(background)
+    resample.SetDefaultPixelValue(default_value)
     registered_image = resample.Execute(moving)
-
+    os.chdir(current_directory)
+    shutil.rmtree(temp_dir)
     return registered_image,inverse_transform
 
 def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[sitk.Image,sitk.Transform]:
@@ -222,7 +223,7 @@ def segment_defacing(ct_image:sitk.Image,structures=['brain','skull'])->Union[si
     """
     # Segment brain and skull from ct image for defacing using totalsegmentator
     ct_nib = sitk_to_nib(ct_image)
-    segmentation = totalsegmentator(ct_nib,output=None,roi_subset=structures,quiet=True)
+    segmentation = totalsegmentator(ct_nib,output=None,roi_subset=structures,quiet=True,fast=True)
     structures = nib_to_sitk(segmentation)
     structures_np = sitk.GetArrayFromImage(structures)
     brain_np = np.copy(structures_np)
