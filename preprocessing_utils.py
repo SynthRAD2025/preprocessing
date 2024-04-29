@@ -310,20 +310,21 @@ def segment_outline(ct_image:sitk.Image,fast=False)->sitk.Image:
     outline.CopyInformation(structures)
     return outline
 
-def get_cbct_fov(cbct:sitk.Image)->sitk.Image:
+def get_cbct_fov(cbct:sitk.Image,background:int=0)->sitk.Image:
     """
     Generate a field of view (FOV) mask for a given CBCT image.
 
-    Args:
-        cbct (sitk.Image): The input CBCT image.
+    Parameters:
+    - cbct (sitk.Image): The input CBCT image.
+    - background (int): The intensity value used to define the background. Default is 0.
 
     Returns:
-        sitk.Image: The FOV mask image.
+    - fov_mask (sitk.Image): The generated FOV mask.
 
     """
     cbct_np = sitk.GetArrayFromImage(cbct)
-    cbct_np[cbct_np>0] = 1
-    cbct_np[cbct_np<=0] = 0
+    cbct_np[cbct_np>background] = 1
+    cbct_np[cbct_np<=background] = 0
     fov_mask_np = np.zeros(cbct_np.shape)
     for i in range(cbct_np.shape[0]):
         slice = cbct_np[i,:,:]
@@ -332,7 +333,7 @@ def get_cbct_fov(cbct:sitk.Image)->sitk.Image:
         r = np.hypot(x - center[0], y - center[1])
         bins = np.arange(0, r.max() + 1, 1)
         radial_mean = ndimage.mean(cbct_np[i,:,:], labels=np.digitize(r, bins), index=np.arange(1, len(bins)))
-        mask_radius = np.where(radial_mean>0.5)[0][-1]
+        mask_radius = np.where(radial_mean>0)[0][-1]
         size = cbct_np.shape
         y, x = np.ogrid[-size[1]//2:size[1]//2, -size[2]//2:size[2]//2]
         fov_mask_np[i,:,:] = x**2 + y**2 <= mask_radius**2
@@ -433,3 +434,27 @@ def mask_image(image:sitk.Image, mask:sitk.Image, mask_value = -1000)->sitk.Imag
     mask = sitk.Cast(mask, sitk.sitkUInt8)
     masked_image = sitk.Mask(image, mask, outsideValue=mask_value)
     return masked_image
+
+def stitch_image(image_inside: sitk.Image, image_outside: sitk.Image, mask: sitk.Image) -> sitk.Image:
+    """
+    Stitches the `image_inside` and `image_outside` based on the `mask`.
+
+    Args:
+        image_inside (sitk.Image): The image to be stitched inside the mask.
+        image_outside (sitk.Image): The image to be stitched outside the mask.
+        mask (sitk.Image): The mask used to determine the stitching region.
+
+    Returns:
+        sitk.Image: The stitched image.
+
+    """
+    image_inside_np = sitk.GetArrayFromImage(image_inside)
+    mask_np = sitk.GetArrayFromImage(mask)
+    image_outside_np = sitk.GetArrayFromImage(image_outside)
+
+    # stitch images
+    image_stitched_np = image_outside_np * (mask_np == 0) + image_inside_np * (mask_np > 0)
+    image_stitched = sitk.GetImageFromArray(image_stitched_np)
+    image_stitched.CopyInformation(image_outside)
+
+    return image_stitched
