@@ -10,7 +10,7 @@ import tempfile
 import shutil
 import os
 
-def read_image(image_path:str)->sitk.Image:
+def read_image(image_path:str,log=False)->sitk.Image:
     """
     Read an image from the specified image path using SimpleITK.
 
@@ -22,9 +22,11 @@ def read_image(image_path:str)->sitk.Image:
 
     """
     image = sitk.ReadImage(image_path)
+    if log != False:
+        log.info(f'Image loaded from {image_path}')
     return image
 
-def read_dicom_image(image_path:str)->sitk.Image:
+def read_dicom_image(image_path:str,log=False)->sitk.Image:
     """
     Reads a DICOM image from the specified image path using SimpleITK.
 
@@ -38,9 +40,11 @@ def read_dicom_image(image_path:str)->sitk.Image:
     dicom_names = reader.GetGDCMSeriesFileNames(image_path)
     reader.SetFileNames(dicom_names)
     image = reader.Execute()
+    if log != False:
+        log.info(f'DICOM image loaded from {image_path}')
     return image
 
-def save_image(image:sitk.Image, image_path:str,compression=True):
+def save_image(image:sitk.Image, image_path:str,compression:bool=True,log=False):
     """
     Save the given SimpleITK image to the specified file path.
     
@@ -49,6 +53,8 @@ def save_image(image:sitk.Image, image_path:str,compression=True):
         image_path (str): The file path where the image will be saved.
     """
     sitk.WriteImage(image, image_path, useCompression=compression)
+    if log != False:
+        log.info(f'Image saved to {image_path}')
 
 # def convert_rtstruct_to_nrrd(rtstruct_path:str, nrrd_dir_path:str):
 #     """
@@ -67,7 +73,7 @@ def save_image(image:sitk.Image, image_path:str,compression=True):
 #                         }
 #     pyplastimatch.convert(**convert_args_ct)
 
-def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter,default_value = 0)->Union[sitk.Image,sitk.Transform]:
+def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
     """
     Perform rigid registration between a fixed image and a moving image using the given parameter file.
 
@@ -83,6 +89,8 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter,default_va
     temp_dir = tempfile.mkdtemp()
     current_directory = os.getcwd()
     os.chdir(temp_dir)
+    
+    parameter = sitk.ReadParameterFile(parameter_file)
     
     # Perform registration based on parameter file
     elastixImageFilter = sitk.ElastixImageFilter()
@@ -120,6 +128,9 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter,default_va
     registered_image = resample.Execute(moving)
     os.chdir(current_directory)
     shutil.rmtree(temp_dir)
+    if log != False:
+        log.info(f'Rigid registration performed using parameter file {parameter_file}')
+    
     return registered_image,inverse_transform
 
 def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[sitk.Image,sitk.Transform]:
@@ -136,7 +147,7 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Uni
 
     return deformed
 
-def correct_orientation(input_image:sitk.Image,order=[0,1,2],flip=[False,False,False]):
+def correct_orientation(input_image:sitk.Image,order=[0,1,2],flip=[False,False,False],log=False):
     """
     Corrects the orientation of an input image based on the specified order and flip parameters.
 
@@ -151,6 +162,8 @@ def correct_orientation(input_image:sitk.Image,order=[0,1,2],flip=[False,False,F
     image_permuted = sitk.PermuteAxes(input_image, order)
     image_flipped = sitk.Flip(image_permuted,flip)
     image_flipped.SetDirection([1,0,0,0,1,0,0,0,1])
+    if log !=False:
+        log.info(f'Orientation corrected using order = {order} and flip = {flip}')
     return image_flipped
 
 def nib_to_sitk(nib_image) -> sitk.Image:
@@ -208,7 +221,7 @@ def sitk_to_nib(sitk_image:sitk.Image):
 
     return img_nib
 
-def segment_defacing(ct_image:sitk.Image,structures=['brain','skull'])->Union[sitk.Image,sitk.Image]:
+def segment_defacing(ct_image:sitk.Image,structures=['brain','skull'],log=False)->Union[sitk.Image,sitk.Image]:
     """
     Generates brain and skull masks for defacing based on the ct image using totalsegmentator.
 
@@ -235,10 +248,11 @@ def segment_defacing(ct_image:sitk.Image,structures=['brain','skull'])->Union[si
     brain.CopyInformation(ct_image)
     skull = sitk.GetImageFromArray(skull_np)
     skull.CopyInformation(ct_image)
-    
+    if log != False:
+        log.info(f'Brain and skull masks generated for defacing')
     return brain,skull
 
-def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image)->sitk.Image:
+def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image,log=False)->sitk.Image:
     """
     Applies defacing to the brain image based on the brain and skull masks.
 
@@ -286,6 +300,8 @@ def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image)->sitk.Image:
     defacing_mask = sitk.GetImageFromArray(face)
     defacing_mask.CopyInformation(brain_mask)
     defacing_mask = sitk.Cast(defacing_mask, sitk.sitkUInt8)
+    if log != False:
+        log.info(f'Defacing mask generated with following parameters: x_brain = {x_brain}, y_brain = {y_brain}, x_skull = {x_skull}, y_skull = {y_skull}')
     return defacing_mask
 
 def segment_outline(ct_image:sitk.Image,fast=False)->sitk.Image:
@@ -310,7 +326,7 @@ def segment_outline(ct_image:sitk.Image,fast=False)->sitk.Image:
     outline.CopyInformation(structures)
     return outline
 
-def get_cbct_fov(cbct:sitk.Image,background:int=0)->sitk.Image:
+def get_cbct_fov(cbct:sitk.Image,background:int=0,log=False)->sitk.Image:
     """
     Generate a field of view (FOV) mask for a given CBCT image.
 
@@ -341,8 +357,20 @@ def get_cbct_fov(cbct:sitk.Image,background:int=0)->sitk.Image:
     fov_mask = sitk.GetImageFromArray(fov_mask_np)
     fov_mask.CopyInformation(cbct)
     fov_mask = sitk.Cast(fov_mask,sitk.sitkUInt8)
+    if log != False:
+        log.info(f'CBCT FOV mask generated using background = {background}')
     return fov_mask
 
+def get_mr_fov(mr:sitk.Image)->sitk.Image:
+    
+    mr_np = sitk.GetArrayFromImage(mr)
+    fov_np = np.ones_like(mr_np)
+    fov_sitk = sitk.GetImageFromArray(fov_np)
+    fov_sitk.CopyInformation(mr)
+    fov_sitk = sitk.Cast(fov_sitk,sitk.sitkUInt8)
+    return fov_sitk
+        
+        
 def apply_transform(image: sitk.Image, transform: sitk.Transform, ref_image:sitk.Image,interpolator:str='nearest') -> sitk.Image:
     """
     Applies the given transform to the input image and returns the transformed image.
@@ -458,3 +486,40 @@ def stitch_image(image_inside: sitk.Image, image_outside: sitk.Image, mask: sitk
     image_stitched.CopyInformation(image_outside)
 
     return image_stitched
+
+def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False):
+    """
+    Resamples the given image to a new spacing.
+
+    Parameters:
+    - image: SimpleITK.Image
+        The input image to be resampled.
+    - new_spacing: list, optional
+        The desired spacing for the resampled image. Default is [1.0, 1.0, 1.0].
+
+    Returns:
+    - resampled_image: SimpleITK.Image
+        The resampled image.
+
+    """
+    # Get the original image's spacing and size
+    original_spacing = image.GetSpacing()
+    original_size = image.GetSize()
+
+    # Calculate the new size based on the original and new spacing
+    new_size = [int(round(osz*osp/nsp)) for osz, osp, nsp in zip(original_size, original_spacing, new_spacing)]
+
+    # Create a resample filter
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetOutputSpacing(new_spacing)
+    resampler.SetSize(new_size)
+    resampler.SetOutputDirection(image.GetDirection())
+    resampler.SetOutputOrigin(image.GetOrigin())
+    resampler.SetTransform(sitk.Transform())
+    resampler.SetDefaultPixelValue(image.GetPixelIDValue())
+
+    # Apply the resampling
+    resampled_image = resampler.Execute(image)
+    if log != False:
+        log.info(f'Image resampled to new spacing {new_spacing}')
+    return resampled_image
