@@ -367,10 +367,33 @@ def get_cbct_fov(cbct:sitk.Image,background:int=0,log=False)->sitk.Image:
     return fov_mask
 
 def get_mr_fov(mr:sitk.Image)->sitk.Image:
-    
+    """
+    Get the field of view (FOV) of a given MR image.
+
+    Parameters:
+    mr (sitk.Image): The input MR image.
+
+    Returns:
+    sitk.Image: The FOV image.
+
+    """
     mr_np = sitk.GetArrayFromImage(mr)
-    fov_np = np.ones_like(mr_np)
-    fov_sitk = sitk.GetImageFromArray(fov_np)
+    fov_np = np.copy(mr_np)
+    fov_np[fov_np == 0] = 0
+    fov_np[fov_np != 0] = 1
+
+    r = np.any(fov_np, axis=(1, 2))
+    c = np.any(fov_np, axis=(0, 2))
+    z = np.any(fov_np, axis=(0, 1))
+
+    rmin, rmax = np.where(r)[0][[0, -1]]
+    cmin, cmax = np.where(c)[0][[0, -1]]
+    zmin, zmax = np.where(z)[0][[0, -1]]
+
+    bbox_img = np.zeros_like(fov_np)
+    bbox_img[rmin:rmax+1, cmin:cmax+1, zmin:zmax+1] = 1
+
+    fov_sitk = sitk.GetImageFromArray(bbox_img)
     fov_sitk.CopyInformation(mr)
     fov_sitk = sitk.Cast(fov_sitk,sitk.sitkUInt8)
     return fov_sitk
@@ -621,10 +644,10 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=10) -> sitk.Image:
     
     # add margin for cropping
     if margin is not None:
-        if I - margin >= 0:
-            I = I - margin
-        if S + margin < dims[0]:
-            S = S + margin
+        if I - int(margin/3) >= 0:
+            I = I - int(margin/3)
+        if S + int(margin/3) < dims[0]:
+            S = S + int(margin/3)
         else:
             S = dims[0] - 1
         if A - margin >= 0:
