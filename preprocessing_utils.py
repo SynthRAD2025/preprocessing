@@ -73,7 +73,7 @@ def save_image(image:sitk.Image, image_path:str,compression:bool=True,log=False)
 #                         }
 #     pyplastimatch.convert(**convert_args_ct)
 
-def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
+def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
     """
     Perform rigid registration between a fixed image and a moving image using the given parameter file.
 
@@ -97,6 +97,8 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,defau
     elastixImageFilter.SetParameterMap(parameter)
     elastixImageFilter.SetFixedImage(moving)  # due to FOV differences CT first registered to MR an inverted in the end
     elastixImageFilter.SetMovingImage(fixed)
+    if mask != None:
+        elastixImageFilter.SetFixedMask(mask)
     elastixImageFilter.LogToConsoleOn()
     elastixImageFilter.LogToFileOff()
     elastixImageFilter.Execute()
@@ -349,10 +351,13 @@ def get_cbct_fov(cbct:sitk.Image,background:int=0,log=False)->sitk.Image:
         r = np.hypot(x - center[0], y - center[1])
         bins = np.arange(0, r.max() + 1, 1)
         radial_mean = ndimage.mean(cbct_np[i,:,:], labels=np.digitize(r, bins), index=np.arange(1, len(bins)))
-        mask_radius = np.where(radial_mean>0)[0][-1]
-        size = cbct_np.shape
-        y, x = np.ogrid[-size[1]//2:size[1]//2, -size[2]//2:size[2]//2]
-        fov_mask_np[i,:,:] = x**2 + y**2 <= mask_radius**2
+        if not radial_mean.any():
+            continue
+        else:
+            mask_radius = np.where(radial_mean>0)[0][-1]
+            size = cbct_np.shape
+            y, x = np.ogrid[-size[1]//2:size[1]//2, -size[2]//2:size[2]//2]
+            fov_mask_np[i,:,:] = x**2 + y**2 <= mask_radius**2
     
     fov_mask = sitk.GetImageFromArray(fov_mask_np)
     fov_mask.CopyInformation(cbct)
