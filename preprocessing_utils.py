@@ -492,7 +492,7 @@ def stitch_image(image_inside: sitk.Image, image_outside: sitk.Image, mask: sitk
 
     return image_stitched
 
-def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False):
+def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False)->sitk.Image:
     """
     Resamples the given image to a new spacing.
 
@@ -528,3 +528,44 @@ def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False):
     if log != False:
         log.info(f'Image resampled to new spacing {new_spacing}')
     return resampled_image
+
+def segment_outline(input:sitk.Image,threshold:float=0.30)->sitk.Image:
+    """
+    Segment the outline of a given input image.
+
+    Parameters:
+    input (sitk.Image): The input image to segment.
+    threshold (float): A relative threshold value for segmentation, 
+                       can be used in case holes are appearing in the mask or too much 
+                       of surrounding elements are included in the mask. Default is 0.30.
+
+    Returns:
+    sitk.Image: The segmented outline image.
+    """
+    
+    # get patient outline segmentation
+    input_np = sitk.GetArrayFromImage(input)
+    
+    #find range of values in image
+    background = np.percentile(input_np, 2.5)
+    high = np.percentile(input_np, 97.5)
+
+    # create mask
+    mask = input_np > background + threshold*(high-background)
+    struct_erosion = np.ones((1,10,10))
+    struct_dilation = np.ones((1,10,10))
+    mask = ndimage.binary_erosion(mask,structure=struct_erosion).astype(mask.dtype)
+    mask = ndimage.binary_dilation(mask,structure=struct_dilation).astype(mask.dtype)
+    mask = ndimage.binary_erosion(mask,structure=struct_erosion).astype(mask.dtype)
+    mask = ndimage.binary_dilation(mask,structure=struct_dilation).astype(mask.dtype)
+    mask = sitk.ConnectedComponent(sitk.GetImageFromArray(mask.astype(int)))
+    sorted_component_image = sitk.RelabelComponent(mask, sortByObjectSize=True)
+    largest_component_binary_image = sorted_component_image == 1
+    mask = largest_component_binary_image
+    mask = sitk.BinaryMorphologicalClosing(largest_component_binary_image, (8, 8, 8))
+    mask = sitk.BinaryFillhole(mask)
+    
+    mask.CopyInformation(input)
+    mask = sitk.Cast(mask,sitk.sitkUInt8)
+    
+    return mask
