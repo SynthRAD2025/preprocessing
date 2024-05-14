@@ -569,3 +569,81 @@ def segment_outline(input:sitk.Image,threshold:float=0.30)->sitk.Image:
     mask = sitk.Cast(mask,sitk.sitkUInt8)
     
     return mask
+
+def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10)->sitk.Image:
+    """
+    Postprocesses the input mask by dilating it and multiplying it with the field of view (FOV) image.
+
+    Parameters:
+    - mask (sitk.Image): The input mask image.
+    - fov (sitk.Image): The field of view (FOV) image.
+    - dilation_radius (int): The radius used for dilation. Default is 10. Dilation is only performed in-plane (2D)
+
+    Returns:
+    - mask_final (sitk.Image): The postprocessed mask image.
+
+    """
+    # dilate mask 
+    dilate = sitk.BinaryDilateImageFilter()
+    dilate.SetKernelType(sitk.sitkBall)
+    dilate.SetKernelRadius((dilation_radius,dilation_radius,0))
+    mask_dilated = dilate.Execute(mask)
+    # multiply with FOV to ensure there is no mask outside of FOV
+    mask_final = mask_dilated*fov
+    
+    return mask_final
+
+def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=10) -> sitk.Image:
+    """
+    Crop the input image based on the boudning box of a provided mask.
+
+    Args:
+        image (sitk.Image): The input image to be cropped.
+        mask (sitk.Image): The mask used to determine the cropping boundaries.
+        margin (int, optional): The margin added to the cropping boundaries. Defaults to 10.
+
+    Returns:
+        sitk.Image: The cropped image.
+    """
+    
+    # get 3D bounding box of mask
+    img = sitk.GetArrayFromImage(mask)
+
+    r = np.any(img, axis=(1, 2))
+    c = np.any(img, axis=(0, 2))
+    z = np.any(img, axis=(0, 1))
+
+    I, S = np.where(r)[0][[0, -1]]
+    A, P = np.where(c)[0][[0, -1]]
+    L, R = np.where(z)[0][[0, -1]]
+
+    dims = np.shape(img)
+    
+    # add margin for cropping
+    if margin is not None:
+        if I - margin >= 0:
+            I = I - margin
+        if S + margin < dims[0]:
+            S = S + margin
+        else:
+            S = dims[0] - 1
+        if A - margin >= 0:
+            A = A - margin
+        if P + margin < dims[1]:
+            P = P + margin
+        else:
+            P = dims[1] - 1
+        if L - margin >= 0:
+            L = L - margin
+        if R + margin < dims[2]:
+            R = R + margin
+        else:
+            R = dims[2] - 1
+    
+    # crop image
+    cropper = sitk.CropImageFilter()
+    cropper.SetLowerBoundaryCropSize((int(L), int(A), int(I)))
+    cropper.SetUpperBoundaryCropSize((int(dims[2] - R), int(dims[1] - P), int(dims[0] - S)))
+    image_cropped = cropper.Execute(image)
+    
+    return image_cropped
