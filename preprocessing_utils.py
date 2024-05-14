@@ -9,6 +9,7 @@ from scipy import ndimage
 import tempfile
 import shutil
 import os
+import matplotlib.pyplot as plt
 
 def read_image(image_path:str,log=False)->sitk.Image:
     """
@@ -679,3 +680,47 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     image_cropped = cropper.Execute(image)
     
     return image_cropped
+
+def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,output_dir:str)->None:
+    """
+    Generate an overview PNG image showing slices from different orientations of the input CT, input image, and mask.
+
+    Parameters:
+    ct (sitk.Image): The CT image.
+    input (sitk.Image): The input image.
+    mask (sitk.Image): The mask image.
+    output_dir (str): The directory to save the overview PNG image.
+
+    Returns:
+    None
+    """
+    
+    shape = np.shape(sitk.GetArrayFromImage(ct))
+    background_ct = np.percentile(sitk.GetArrayFromImage(ct), 0.1)
+    high_ct = np.percentile(sitk.GetArrayFromImage(ct), 99.9)
+    background_input = np.percentile(sitk.GetArrayFromImage(input), 0.1)
+    high_input = np.percentile(sitk.GetArrayFromImage(input), 99.9)
+
+    slice_sag = shape[2]//2
+    slice_cor = shape[1]//2
+    slice_ax = shape[0]//2
+    fig,ax = plt.subplots(3,3,figsize=(15,15))
+    ax[0,0].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[0,1].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[0,1].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
+    ax[0,2].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,2].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
+
+    ax[1,0].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,1].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[1,1].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
+    ax[1,2].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,2].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+
+    ax[2,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[2,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
+    ax[2,1].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
+    ax[2,2].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    plt.savefig(os.path.join(output_dir,'overview.png'),dpi=300,bbox_inches='tight')
