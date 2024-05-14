@@ -587,11 +587,20 @@ def segment_outline(input:sitk.Image,threshold:float=0.30)->sitk.Image:
     mask = largest_component_binary_image
     mask = sitk.BinaryMorphologicalClosing(largest_component_binary_image, (8, 8, 8))
     mask = sitk.BinaryFillhole(mask)
-    
     mask.CopyInformation(input)
     mask = sitk.Cast(mask,sitk.sitkUInt8)
     
-    return mask
+    # 2D axial hole filling 
+    mask_np = sitk.GetArrayFromImage(mask)
+    mask_np_filled = np.zeros_like(mask_np)
+    for i in range(mask_np.shape[0]):
+        mask_np_filled[i] = ndimage.binary_fill_holes(mask_np[i])
+
+    mask_filled = sitk.GetImageFromArray(mask_np_filled)
+    mask_filled.CopyInformation(mask)
+    mask_filled = sitk.Cast(mask_filled, sitk.sitkUInt8)
+
+    return mask_filled
 
 def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10)->sitk.Image:
     """
@@ -616,7 +625,7 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10)
     
     return mask_final
 
-def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=10) -> sitk.Image:
+def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     """
     Crop the input image based on the boudning box of a provided mask.
 
