@@ -1,2 +1,5 @@
 utils_stage1.ipynb
 /__pycache__/
+*.log
+stage1.ipynb
+stage2.ipynb

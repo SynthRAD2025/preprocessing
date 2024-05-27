@@ -1,6 +1,7 @@
 //Parameter file
 
 //********adaptions***********
+//Original -> /nfs/bsc01/researchData/PROJECT/PEDIATRIC/Script/RegistrationPar/ParameterFileRigid_MRreg2CT.txt
 //(RequiredRatioOfValidSamples 0.05)	-> extra parameter
 //(MaximumNumberOfSamplingAttempts 50) 	-> was 15 attempts -> back to 20 attempts
 //(NumberOfSpatialSamples 3000)		-> was 2048 samples
@@ -22,6 +23,7 @@
 (MovingInternalImagePixelType "float")
 (FixedImageDimension 3)
 (MovingImageDimension 3)
+(ErodeMask "true")
 
 
 // Specify whether you want to take into account the so-called
@@ -34,7 +36,8 @@
 
 //*********Components**********
 
-(Registration "MultiResolutionRegistration")
+//(Registration "MultiResolutionRegistration")
+(Registration "MultiMetricMultiResolutionRegistration")
 
 //***Interpolator
 //(Interpolator "BSplineInterpolator")
@@ -56,17 +59,17 @@
 // quite ok in general. The Transform and Metric are important
 // and need to be chosen careful for each application. See manual.
 (Transform "EulerTransform")
-(Sampler "Random")
+(Sampler "RandomCoordinate")
 (Optimizer "AdaptiveStochasticGradientDescent")
-(Metric "AdvancedMattesMutualInformation")
+(Metric "AdvancedNormalizedCorrelation" "AdvancedMattesMutualInformation")
+//(Metric "AdvancedMattesMutualInformation")
 
 //************Transform************
 
 // Scales the rotations compared to the translations, to make
 // sure they are in the same range. In general, it's best to
 // use automatic scales estimation:
-//(AutomaticScalesEstimation "true")
-(Scales 10000)
+(AutomaticScalesEstimation "false")
 
 // Automatically guess an initial translation by aligning the
 // geometric centers of the fixed and moving.
@@ -85,7 +88,7 @@
 // Number of grey level bins in each resolution level,
 // for the mutual information. 16 or 32 usually works fine.
 // You could also employ a hierarchical strategy:
-(NumberOfHistogramBins 32 32 32 32)
+(NumberOfHistogramBins 16 32 32 64)
 //(NumberOfHistogramBins 32)
 
 
@@ -108,7 +111,7 @@
 // Maximum number of iterations in each resolution level:
 // 200-500 works usually fine for rigid registration.
 // For more robustness, you may increase this to 1000-2000.
-(MaximumNumberOfIterations 1000 1000 500 500)
+(MaximumNumberOfIterations 1000 1000 300 150)
 //(MaximumNumberOfIterations 100 100 30 30)
 
 
@@ -116,7 +119,7 @@
 // which usually works well. In case of unusual high-resolution images
 // (eg histology) it is necessary to increase this value a bit, to the size
 // of the "smallest visible structure" in the image:
-//(MaximumStepLength 1.0)
+(MaximumStepLength 2.0)
 
 
 //************Image Sampling************
@@ -163,7 +166,7 @@
 (FinalBSplineInterpolationOrder 1)
 
 //Default pixel value for pixels that come from outside the picture:
-(DefaultPixelValue -1000)
+(DefaultPixelValue 0)
 
 //************Output***************
 
@@ -172,7 +175,7 @@
 
 //***********MiscVisulaization
 (WriteTransformParametersEachIteration "false" "false" "false" "false")
-(WriteTransformParametersEachResolution "true" "true" "true" "true")
+(WriteTransformParametersEachResolution "false" "false" "false" "true")
 
 // Define output format
 //(ResultImagePixelType "double")

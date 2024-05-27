@@ -102,6 +102,7 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
         elastixImageFilter.SetFixedMask(mask)
     elastixImageFilter.LogToConsoleOn()
     elastixImageFilter.LogToFileOff()
+    elastixImageFilter.SetNumberOfThreads(16)
     elastixImageFilter.Execute()
     elastixImageFilter.SetOutputDirectory(temp_dir)
 
@@ -136,6 +137,121 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     
     return registered_image,inverse_transform
 
+def rigid_registration_v2(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
+    """
+    Perform rigid registration between a fixed image and a moving image using the given parameter file.
+
+    Parameters:
+    fixed (sitk.Image): The fixed image to register.
+    moving (sitk.Image): The moving image to register.
+    parameter: The parameter file for the registration.
+
+    Returns:
+    Tuple[sitk.Image, sitk.Transform]: A tuple containing the registered image and the inverse transform.
+
+    """
+    temp_dir = tempfile.mkdtemp()
+    current_directory = os.getcwd()
+    os.chdir(temp_dir)
+    
+    parameter = sitk.ReadParameterFile(parameter_file)
+    
+    # Perform registration based on parameter file
+    elastixImageFilter = sitk.ElastixImageFilter()
+    elastixImageFilter.SetParameterMap(parameter)
+    elastixImageFilter.SetFixedImage(fixed)  # due to FOV differences CT first registered to MR an inverted in the end
+    elastixImageFilter.SetMovingImage(moving)
+    #if mask != None:
+        #elastixImageFilter.SetMovingMask(mask)
+    elastixImageFilter.LogToConsoleOn()
+    elastixImageFilter.LogToFileOff()
+    elastixImageFilter.Execute()
+    elastixImageFilter.SetOutputDirectory(temp_dir)
+
+    # convert to itk transform format
+    transform = elastixImageFilter.GetTransformParameterMap(0)
+    x = transform.values()
+    center = np.array((x[0])).astype(np.float64)
+    rigid = np.array((x[22])).astype(np.float64)
+    transform_itk = sitk.Euler3DTransform()
+    transform_itk.SetParameters(rigid)
+    transform_itk.SetCenter(center)
+    transform_itk.SetComputeZYX(False)
+
+    #convert elastix to itk format
+
+    # save itk transform to correct MR mask later
+    #transform_itk.WriteTransform(output)
+    #transform_itk.WriteTransform(str('registration_parameters.txt'))
+
+    ##invert transform to get MR registered to CT
+    # inverse_transform = transform_itk.GetInverse()
+
+    ##transform moving image
+    resample = sitk.ResampleImageFilter()
+    resample.SetReferenceImage(fixed)
+    resample.SetTransform(transform_itk)
+    resample.SetInterpolator(sitk.sitkLinear)
+    resample.SetDefaultPixelValue(default_value)
+    registered_image = resample.Execute(moving)
+    os.chdir(current_directory)
+    shutil.rmtree(temp_dir)
+    if log != False:
+        log.info(f'Rigid registration performed using parameter file {parameter_file}')
+    
+    return registered_image,transform_itk
+
+def translation_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False):
+    temp_dir = tempfile.mkdtemp()
+    current_directory = os.getcwd()
+    os.chdir(temp_dir)
+
+    parameter = sitk.ReadParameterFile(parameter_file)
+
+    # Perform registration based on parameter file
+    elastixImageFilter = sitk.ElastixImageFilter()
+    elastixImageFilter.SetParameterMap(parameter)
+    elastixImageFilter.SetFixedImage(moving)  # due to FOV differences CT first registered to MR an inverted in the end
+    elastixImageFilter.SetMovingImage(fixed)
+    if mask != None:
+        elastixImageFilter.SetFixedMask(mask)
+    elastixImageFilter.LogToConsoleOn()
+    elastixImageFilter.LogToFileOff()
+    elastixImageFilter.Execute()
+    elastixImageFilter.SetOutputDirectory(temp_dir)
+
+    # convert to itk transform format
+    # transform = elastixImageFilter.GetTransformParameterMap(0)
+    # x = transform.values()
+    # center = np.array((x[0])).astype(np.float64)
+    # rigid = np.array((x[22])).astype(np.float64)
+    # transform_itk = sitk.Euler3DTransform()
+    # transform_itk.SetParameters(rigid)
+    # transform_itk.SetCenter(center)
+    # transform_itk.SetComputeZYX(False)
+
+    #convert elastix to itk format
+    transform = elastixImageFilter.GetTransformParameterMap(0)
+    x = transform.values()
+    translation = np.array((x[-2])).astype(np.float64)
+    transform_itk = sitk.TranslationTransform(3)
+    transform_itk.SetParameters(translation)
+
+    #invert transform to get MR registered to CT
+    transform_itk = transform_itk.GetInverse()
+
+    ##transform moving image
+    resample = sitk.ResampleImageFilter()
+    resample.SetReferenceImage(fixed)
+    resample.SetTransform(transform_itk)
+    resample.SetInterpolator(sitk.sitkLinear)
+    resample.SetDefaultPixelValue(default_value)
+    registered_image = resample.Execute(moving)
+    os.chdir(current_directory)
+    shutil.rmtree(temp_dir)
+    
+    return registered_image, transform_itk
+
 def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[sitk.Image,sitk.Transform]:
     
     # Perform registration based on parameter file
@@ -150,7 +266,7 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Uni
 
     return deformed
 
-def correct_orientation(input_image:sitk.Image,order=[0,1,2],flip=[False,False,False],log=False):
+def correct_image_properties(input_image:sitk.Image,order=[0,1,2],flip=[False,False,False], intensity_shift=None,data_type=None, mr_overlap_correction=False, log=False):
     """
     Corrects the orientation of an input image based on the specified order and flip parameters.
 
@@ -162,12 +278,22 @@ def correct_orientation(input_image:sitk.Image,order=[0,1,2],flip=[False,False,F
     Returns:
     sitk.Image: The corrected image with the specified orientation.
     """
-    image_permuted = sitk.PermuteAxes(input_image, order)
-    image_flipped = sitk.Flip(image_permuted,flip)
-    image_flipped.SetDirection([1,0,0,0,1,0,0,0,1])
+    image = sitk.PermuteAxes(input_image, order)
+    image = sitk.Flip(image,flip)
+    image.SetDirection([1,0,0,0,1,0,0,0,1])
+    
+    if data_type != None:
+        image = sitk.Cast(image,data_type)
+        
+    if intensity_shift != None:
+        image = image + intensity_shift
+    
+    if mr_overlap_correction:
+        image[image==4000] = 0
+        
     if log !=False:
         log.info(f'Orientation corrected using order = {order} and flip = {flip}')
-    return image_flipped
+    return image
 
 def nib_to_sitk(nib_image) -> sitk.Image:
     """
@@ -603,7 +729,7 @@ def segment_outline(input:sitk.Image,threshold:float=0.30)->sitk.Image:
 
     return mask_filled
 
-def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10)->sitk.Image:
+def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,IS_correction=None, defacing_correction = None, cone_correction=None)->sitk.Image:
     """
     Postprocesses the input mask by dilating it and multiplying it with the field of view (FOV) image.
 
@@ -621,9 +747,26 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10)
     dilate.SetKernelType(sitk.sitkBall)
     dilate.SetKernelRadius((dilation_radius,dilation_radius,0))
     mask_dilated = dilate.Execute(mask)
+    
     # multiply with FOV to ensure there is no mask outside of FOV
     mask_final = mask_dilated*fov
     
+    if IS_correction != None:
+        bbox = get_bounding_box(mask_final)
+        if bbox[2] > 0:
+            bbox[2] = bbox[2]-1
+        if bbox[5] < mask_final.GetSize()[2]-1:
+            bbox[5] = bbox[5]+1
+        mask_final[:,:,bbox[2]:bbox[2]+IS_correction] = 0
+        mask_final[:,:,bbox[5]-IS_correction:bbox[5]] = 0
+    
+    if defacing_correction != None:
+        defacing_np = sitk.GetArrayFromImage(defacing_correction)
+        mask_final_np = sitk.GetArrayFromImage(mask_final)
+        mask_final_np[defacing_np==1]=0
+        mask_final = sitk.GetImageFromArray(mask_final_np)
+        mask_final.CopyInformation(mask)
+        
     return mask_final
 
 def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
@@ -633,7 +776,7 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     Args:
         image (sitk.Image): The input image to be cropped.
         mask (sitk.Image): The mask used to determine the cropping boundaries.
-        margin (int, optional): The margin added to the cropping boundaries. Defaults to 10.
+        margin (int, optional): The margin added to the cropping boundaries. Defaults to 20.
 
     Returns:
         sitk.Image: The cropped image.

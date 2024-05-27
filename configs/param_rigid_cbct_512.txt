@@ -1,16 +1,6 @@
 //Parameter file
 
-//********adaptions***********
-//(RequiredRatioOfValidSamples 0.05)	-> extra parameter
-//(MaximumNumberOfSamplingAttempts 50) 	-> was 15 attempts -> back to 20 attempts
-//(NumberOfSpatialSamples 3000)		-> was 2048 samples
-//(UseRandomSampleRegion "false")	-> was 'true'
-// center of gravity instead of geometricalCenter			(edit:25022019)
-// image sampler on grid (4 4 4 4) instead of (random)coordinateSampler (edit:25022019)
-// (MaximumNumberOfIterations 1000 1000 300 300) -> was (1000 1000 1500 1500)(edit:25022019)
-
 //**********ImageTypes**********
-
 // The internal pixel type, used for internal computations
 // Leave to float in general.
 // NB: this is not the type of the input images! The pixel
@@ -22,6 +12,7 @@
 (MovingInternalImagePixelType "float")
 (FixedImageDimension 3)
 (MovingImageDimension 3)
+(ErodeMask "true")
 
 
 // Specify whether you want to take into account the so-called
@@ -34,7 +25,8 @@
 
 //*********Components**********
 
-(Registration "MultiResolutionRegistration")
+//(Registration "MultiResolutionRegistration")
+(Registration "MultiMetricMultiResolutionRegistration")
 
 //***Interpolator
 //(Interpolator "BSplineInterpolator")
@@ -55,9 +47,11 @@
 // The optimizer AdaptiveStochasticGradientDescent (ASGD) works
 // quite ok in general. The Transform and Metric are important
 // and need to be chosen careful for each application. See manual.
+//(Transform "TranslationTransform")
 (Transform "EulerTransform")
 (Sampler "RandomCoordinate")
 (Optimizer "AdaptiveStochasticGradientDescent")
+//(Metric "AdvancedMattesMutualInformation" "AdvancedNormalizedCorrelation")
 (Metric "AdvancedMattesMutualInformation")
 
 //************Transform************
@@ -65,18 +59,20 @@
 // Scales the rotations compared to the translations, to make
 // sure they are in the same range. In general, it's best to
 // use automatic scales estimation:
-(AutomaticScalesEstimation "true")
+//(AutomaticScalesEstimation "true")
+(Scales 1000000)
 
 // Automatically guess an initial translation by aligning the
 // geometric centers of the fixed and moving.
 (AutomaticTransformInitialization "true")
+//(AutomaticTransformInitializationMethod "GeometricalCenter")
+(AutomaticTransformInitializationMethod "CenterOfGravity")
 
 // Whether transforms are combined by composition or by addition.
 // In generally, Compose is the best option in most cases.
 // It does not influence the results very much.
 (HowToCombineTransforms "Compose")
-//(AutomaticTransformInitializationMethod "GeometricalCenter")
-(AutomaticTransformInitializationMethod "CenterOfGravity")
+
 
 
 //************Similarity Measure************
@@ -84,7 +80,7 @@
 // Number of grey level bins in each resolution level,
 // for the mutual information. 16 or 32 usually works fine.
 // You could also employ a hierarchical strategy:
-(NumberOfHistogramBins 32 32 32 32)
+(NumberOfHistogramBins 64 64 64 64)
 //(NumberOfHistogramBins 32)
 
 
@@ -95,11 +91,7 @@
 // images and large deformations, 5 or 6 may even be useful.
 (NumberOfResolutions 4)
 (ImagePyramidSchedule 8 8 8  4 4 4  2 2 2  1 1 1 )
-//(FinalGridSpacingInVoxels 1.0 1.0 1.0)
-//(FinalGridSpacingInPhysicalUnits 1.0 1.0 1.0)
-//(GridSpacingSchedule 6.0 6.0 6.0 3.0 3.0 3.0 1.0 1.0 1.0)
-// Make sure that the number of elements equals the number
-// of resolutions times the image dimension
+
 
 
 // ******************* Optimizer ****************************
@@ -107,15 +99,18 @@
 // Maximum number of iterations in each resolution level:
 // 200-500 works usually fine for rigid registration.
 // For more robustness, you may increase this to 1000-2000.
-(MaximumNumberOfIterations 1000 1000 500 500)
-//(MaximumNumberOfIterations 100 100 30 30)
+//(MaximumNumberOfIterations 1500 1500 1000 1000)
+(MaximumNumberOfIterations 5000 5000 1000 1000)
 
 
 // The step size of the optimizer, in mm. By default the voxel size is used.
 // which usually works well. In case of unusual high-resolution images
 // (eg histology) it is necessary to increase this value a bit, to the size
 // of the "smallest visible structure" in the image:
-//(MaximumStepLength 1.0)
+(MaximumStepLength 60.0 20.0 5.0 2.0)
+//(MaximumStepLengthRatio 0.2 0.5 1 1)
+(SP_A 10000.000000 1000.000000 100.000000 1.000000 )
+//(Sp_a 1000 500 500 200)
 
 
 //************Image Sampling************
@@ -125,19 +120,20 @@
 // With an AdaptiveStochasticGradientDescent optimizer,
 // in combination with the two options below, around 2000
 // samples may already suffice.
-(NumberOfSpatialSamples 3000)
+(NumberOfSpatialSamples 512)
+(CheckNumberOfSamples "true")
 //(NumberOfSpatialSamples 2048)
 
 // Refresh these spatial samples in every iteration, and select
 // them randomly. See the manual for information on other sampling
 // strategies.
-//(NewSamplesEveryIteration "true")
+(NewSamplesEveryIteration "true")
 //(ImageSampler "RandomCoordinate")
-//(ImageSampler "Random")
+(ImageSampler "Random")
 //(ImageSampler "Full")
-(ImageSampler "Grid")
+//(ImageSampler "Grid")
 (SampleGridSpacing 4 4 4 2)
-(MaximumNumberOfSamplingAttempts 20)
+(MaximumNumberOfSamplingAttempts 2000)
 (RequiredRatioOfValidSamples 0.045)
 
 
@@ -171,7 +167,7 @@
 
 //***********MiscVisulaization
 (WriteTransformParametersEachIteration "false" "false" "false" "false")
-(WriteTransformParametersEachResolution "true" "true" "true" "true")
+(WriteTransformParametersEachResolution "false" "false" "false" "true")
 
 // Define output format
 //(ResultImagePixelType "double")

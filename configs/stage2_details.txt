@@ -1,0 +1,65 @@
+Task1:
+    Abdomen:
+        1ABA001
+        1ABA002
+        1ABA006
+        1ABB001 (threshold = 0.2, IS_correction = 10)
+        1ABB002 (threshold = 0.2, IS_correction = 10)
+        1ABB003 (threshold = 0.2, IS_correction = 10)
+        1ABC001 (threshold = 0.4)
+        1ABC002 (threshold = 0.1)
+        1ABC003 (threshold = 0.1)
+    HN:
+        1HNA001 (threshold = 0.1, defacing_correction)
+        1HNA002 (threshold = 0.1, defacing_correction)
+        1HNA003 (threshold = 0.1, defacing_correction)
+        1HNA004 (threshold = 0.1, defacing_correction)
+        1HNA005 (threshold = 0.1, defacing_correction)
+        1HNA006 (threshold = 0.1, defacing_correction)
+        1HNC001 (threshold = 0.6, defacing_correction)
+        1HNC002 (threshold = 0.6, defacing_correction)
+        1HNC004 (threshold = 0.6, defacing_correction)
+    Thorax:
+        1THA001 
+        1THA036
+        1THA201
+        1THB001 (threshold = 0.2, IS_correction = 10)
+        1THB002 (threshold = 0.2, IS_correction = 10)
+        1THB004 (threshold = 0.2, IS_correction = 10)
+        1THC001
+        1THC002
+        1THC003
+
+Task2:
+    Abdomen:
+        2ABA002 (threshold = 0.4)
+        2ABA003
+        2ABA004
+        2ABB001
+        2ABB002
+        2ABB003
+        2ABC001
+        2ABC002
+        2ABC004
+    HN:
+        2HNA001 (threshold = 0.2, defacing_correction)
+        2HNA002 (threshold = 0.2, defacing_correction)
+        2HNA003 (threshold = 0.4, defacing_correction)
+        2HNB001 (threshold = 0.4, defacing_correction)
+        2HNB002 (threshold = 0.6, defacing_correction)
+        2HNB003 (threshold = 0.6, defacing_correction)
+        2HNC002 (threshold = 0.6, defacing_correction)
+        2HNC003 (threshold = 0.6, defacing_correction)
+        2HNC004 (threshold = 0.4, defacing_correction)
+    Thorax:
+        2THA001
+        2THA003
+        2THA004
+        2THB001
+        2THB002
+        2THB003
+        2THC001
+        2THC002
+        2THC003
+
+        

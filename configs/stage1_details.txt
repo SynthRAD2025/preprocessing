@@ -1,0 +1,64 @@
+Task1:
+    Abdomen:
+        1ABA001
+        1ABA002
+        1ABA006
+        1ABB001 ()
+        1ABB002 ()
+        1ABB003 ()
+        1ABC001 ()
+        1ABC002 ("param_rigid_cbct_1024.txt")
+        1ABC003 ("param_rigid.txt")
+    HN:
+        1HNA001 (param_rigid_cbct_1024)
+        1HNA002 (param_rigid_cbct_1024, mr_overlap_correction = True)
+        1HNA003 (param_rigid_cbct_1024)
+        1HNA004 (param_rigid_cbct_1024, mr_overlap_correction = True)
+        1HNA005 (param_rigid_cbct_1024)
+        1HNA006 (param_rigid_cbct_1024, mr_overlap_correction = True)
+        1HNC001 (param_rigid_mr_512 + fov_mask)
+        1HNC002 (param_rigid_mr_512 + fov_mask)
+        1HNC004 (param_rigid_mr_512 + fov_mask)
+    Thorax
+        1THA001 
+        1THA036
+        1THA201
+        1THB001
+        1THB002
+        1THB004
+        1THC001
+        1THC002
+        1THC003
+
+Task2:
+    Abdomen:
+        2ABA001
+        2ABA002
+        2ABA003
+        2ABB001
+        2ABB002
+        2ABB003
+        2ABC001
+        2ABC002
+        2ABC004
+    HN:
+        2HNA001 (param_rigid_cbct_1024)
+        2HNA002 (param_rigid_cbct_1024)
+        2HNA003 (param_rigid_cbct_1024)
+        2HNB001 (param_rigid_cbct_512, order=[2,1,0], flip = [False,False,True], intensity_shift = -1000 )
+        2HNB002 (param_rigid_cbct_512, order=[2,1,0], flip = [False,False,True], intensity_shift = -1000 )
+        2HNB003 (param_rigid_cbct_512, order=[2,1,0], flip = [False,False,True], intensity_shift = -1000 )
+        2HNC002 (param_rigid_cbct_1024)
+        2HNC003 (param_rigid_cbct_1024)
+        2HNC004 (param_rigid_cbct_1024)
+    Thorax:
+        2THA001
+        2THA003
+        2THA004
+        2THB001
+        2THB002
+        2THB003
+        2THC001
+        2THC002
+        2THC003
+    
