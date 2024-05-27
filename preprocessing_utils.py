@@ -81,7 +81,10 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     Parameters:
     fixed (sitk.Image): The fixed image to register.
     moving (sitk.Image): The moving image to register.
-    parameter: The parameter file for the registration.
+    parameter_file (str): The path to the parameter file for the registration.
+    mask (sitk.Image, optional): The mask image to be used during registration. Defaults to None.
+    default_value (float, optional): The default pixel value for the resampled image. Defaults to 0.
+    log (bool, optional): Whether to log the registration process. Defaults to False.
 
     Returns:
     Tuple[sitk.Image, sitk.Transform]: A tuple containing the registered image and the inverse transform.
@@ -137,18 +140,22 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     
     return registered_image,inverse_transform
 
+
 def rigid_registration_v2(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
     """
-    Perform rigid registration between a fixed image and a moving image using the given parameter file.
-
+    Perform rigid registration between a fixed image and a moving image using the given parameter file. This function does not invert the transform (moving gets registered to fixed).
+    
     Parameters:
-    fixed (sitk.Image): The fixed image to register.
-    moving (sitk.Image): The moving image to register.
-    parameter: The parameter file for the registration.
+        fixed (sitk.Image): The fixed image to register.
+        moving (sitk.Image): The moving image to register.
+        parameter_file: The parameter file for the registration.
+        mask: Optional mask image to be used during registration.
+        default_value: Default pixel value for the resampled image.
+        log: Flag indicating whether to log information about the registration.
 
     Returns:
-    Tuple[sitk.Image, sitk.Transform]: A tuple containing the registered image and the inverse transform.
-
+        Tuple[sitk.Image, sitk.Transform]: A tuple containing the registered image and the transform used for registration.
+    
     """
     temp_dir = tempfile.mkdtemp()
     current_directory = os.getcwd()
@@ -202,6 +209,21 @@ def rigid_registration_v2(fixed:sitk.Image, moving:sitk.Image, parameter_file, m
     return registered_image,transform_itk
 
 def translation_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False):
+    """
+    Perform translation-based image registration using the Elastix library.
+
+    Args:
+        fixed (sitk.Image): The fixed image to register.
+        moving (sitk.Image): The moving image to register.
+        parameter_file (str): The path to the parameter file for Elastix registration.
+        mask (sitk.Image, optional): The mask to apply during registration. Defaults to None.
+        default_value (float, optional): The default pixel value for the registered image. Defaults to 0.
+        log (bool, optional): Whether to log the registration process. Defaults to False.
+
+    Returns:
+        tuple: A tuple containing the registered image (sitk.Image) and the transformation (sitk.TranslationTransform).
+    """
+    
     temp_dir = tempfile.mkdtemp()
     current_directory = os.getcwd()
     os.chdir(temp_dir)
@@ -266,18 +288,23 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Uni
 
     return deformed
 
-def correct_image_properties(input_image:sitk.Image,order=[0,1,2],flip=[False,False,False], intensity_shift=None,data_type=None, mr_overlap_correction=False, log=False):
+def correct_image_properties(input_image:sitk.Image, order=[0,1,2], flip=[False,False,False], intensity_shift=None, data_type=None, mr_overlap_correction=False, log=False):
     """
-    Corrects the orientation of an input image based on the specified order and flip parameters.
+    Corrects the properties of an input image based on the specified parameters.
 
     Parameters:
     input_image (sitk.Image): The input image to be corrected.
-    order (list[int]): The order of axes for permuting the image. Default is [0, 1, 2].
+    order (list[int]): The order of axes permutation. Default is [0, 1, 2].
     flip (list[bool]): The flip status for each axis. Default is [False, False, False].
+    intensity_shift (float): The intensity shift to be applied to the image. Default is None.
+    data_type (sitk.PixelIDValueEnum): The desired data type of the image. Default is None.
+    mr_overlap_correction (bool): Flag indicating whether to perform MR overlap correction. Default is False.
+    log (bool): Flag indicating whether to log the orientation correction. Default is False.
 
     Returns:
-    sitk.Image: The corrected image with the specified orientation.
+    sitk.Image: The corrected image.
     """
+    
     image = sitk.PermuteAxes(input_image, order)
     image = sitk.Flip(image,flip)
     image.SetDirection([1,0,0,0,1,0,0,0,1])
@@ -737,6 +764,9 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
     - mask (sitk.Image): The input mask image.
     - fov (sitk.Image): The field of view (FOV) image.
     - dilation_radius (int): The radius used for dilation. Default is 10. Dilation is only performed in-plane (2D)
+    - IS_correction (int or None): The number of slices to be corrected in the inferior-superior direction. Default is None.
+    - defacing_correction (sitk.Image or None): The defacing mask which is used to correct the patient outline (limit dilation in that area). Default is None.
+    - cone_correction (None): Not yet implemented.
 
     Returns:
     - mask_final (sitk.Image): The postprocessed mask image.
