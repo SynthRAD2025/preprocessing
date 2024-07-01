@@ -1,0 +1,2 @@
+﻿ID,task,region,ct_path,input_path,struct_path,output_dir,defacing,registration,background,order,flip,resample,mr_overlap_correction,
+1HNA004,1,HN,/workspace/data/1%/Task1/HN/1HNA004/ct_or.nii.gz,/workspace/data/1%/Task1/HN/1HNA004/mr_or.nii.gz,/workspace/data/1%/Task1/HN/1HNA004/struct.dcm,/workspace/data/1%/Task1/HN/1HNA004/output_test,True,/workspace/code/preprocessing/configs/param_rigid_cbct_1024.txt,0,"[0,1,2]","[False,False,False]","[1,1,3]",True,

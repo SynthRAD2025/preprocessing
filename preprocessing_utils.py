@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import os
 import matplotlib.pyplot as plt
+import csv
 
 def read_image(image_path:str,log=False)->sitk.Image:
     """
@@ -131,7 +132,7 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     resample.SetReferenceImage(fixed)
     resample.SetTransform(inverse_transform)
     resample.SetInterpolator(sitk.sitkLinear)
-    resample.SetDefaultPixelValue(default_value)
+    resample.SetDefaultPixelValue(float(default_value))
     registered_image = resample.Execute(moving)
     os.chdir(current_directory)
     shutil.rmtree(temp_dir)
@@ -897,3 +898,50 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,output_
     ax[2,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
     
     plt.savefig(os.path.join(output_dir,'overview.png'),dpi=300,bbox_inches='tight')
+    
+def read_csv_lines(file):
+    """
+    Reads a CSV file and returns a list of lines.
+
+    Args:
+        file (str): The path to the CSV file.
+
+    Returns:
+        list: A list of lines, where each line is represented as a list of values.
+
+    """
+    lines = []
+    with open(file, newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            lines.append(row)
+    return lines
+
+def csv_to_dict(file):
+    """
+    Convert a CSV file to a dictionary.
+
+    Args:
+        file (str): The path to the CSV file.
+
+    Returns:
+        dict: A dictionary representation of the CSV file, where the keys are the values in the first column
+              and the values are dictionaries representing each row, with keys as the column names and values
+              as the corresponding values in the row.
+    """
+    lines = read_csv_lines(file)
+    # convert lines in dict
+    patients_dict = {}
+    for line in lines[1:]:
+        patients_dict[line[0]] = {}
+        for i in range(1, len(line)):
+            patients_dict[line[0]][lines[0][i]] = line[i]
+        #if not a string parse file types correctly
+        patients_dict[line[0]]['task'] = int(patients_dict[line[0]]['task'])
+        patients_dict[line[0]]['background'] = float(patients_dict[line[0]]['background'])
+        patients_dict[line[0]]['defacing'] = True if patients_dict[line[0]]['defacing'] == 'True' else False
+        patients_dict[line[0]]['order'] = [int(i) for i in patients_dict[line[0]]['order'].strip('[]').split(',')]
+        patients_dict[line[0]]['flip'] = [True if x == 'True' else False for x in patients_dict[line[0]]['flip'].strip('[]').split(',')]
+        patients_dict[line[0]]['resample'] = [float(i) for i in patients_dict[line[0]]['resample'].strip('[]').split(',')]
+        
+    return patients_dict
