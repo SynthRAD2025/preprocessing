@@ -4,6 +4,9 @@ import SimpleITK as sitk
 import logging
 import sys
 
+# Set this to true if you want to skip already pre-processsed patients (checks if output files already exists)
+skip_existing = True
+
 if __name__ == "__main__":
 
     ## set up logging to console and file
@@ -33,15 +36,38 @@ if __name__ == "__main__":
 
     for pat in patient_dict:
         patient = patient_dict[pat]
+        # check if output files already exist and skip if flag is set
+        if skip_existing:
+            if patient['task'] == 1:
+                if (os.path.isfile(os.path.join(patient['output_dir'],'mr_s1.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_s1.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'fov_s1.nii.gz'))):
+                    logger.info(f'Patient {pat} already pre-processed. Skipping...')
+                    continue
+            elif patient['task'] == 2:
+                if (os.path.isfile(os.path.join(patient['output_dir'],'cbct_s1.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_s1.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'fov_s1.nii.gz'))):
+                    logger.info(f'Patient {pat} already pre-processed. Skipping...')
+                    continue
+
         # log patient details
-        logger.info(f'Processing patient:\n Name: {pat} \n Input: {patient['input_path']} \n CT: {patient['ct_path']} \n Output: {patient['output_dir']}')
+        logger.info(f'''Processing case {pat}:
+                            Input: {patient['input_path']}
+                            CT: {patient['ct_path']}
+                            Output: {patient['output_dir']}''')
         
         # Load input (CBCT or MRI) and CT as sitk images, if dicom provide path to directory, if other file type provide path to file
         input = utils.read_image(patient['input_path'],log=logger)   
         ct = utils.read_image(patient['ct_path'],log=logger)
         
         # if necessary correct orientation of input/MRI (swap or flip axes)
-        input = utils.correct_image_properties(input,patient['order'],patient['flip'],mr_overlap_correction = patient['mr_overlap_correction'],log=logger)
+        input = utils.correct_image_properties(input_image = input,
+                                               order = patient['order'],
+                                               flip = patient['flip'],
+                                               mr_overlap_correction = patient['mr_overlap_correction'],
+                                               intensity_shift = patient['intensity_shift'],
+                                               log = logger)
         
         # calculate CBCT/MRI FOV mask
         if patient['task'] == 1:
@@ -51,8 +77,6 @@ if __name__ == "__main__":
         
         # Register CBCT/MRI to CT
         parameter_file = patient['registration']
-        # input, transform = utils.translation_registration(ct, input, "/workspace/code/preprocessing/configs/param_trans_cbct_radboud.txt", mask=fov_mask, default_value=patient['background'], log=logger)
-        # fov_mask = utils.apply_transform(fov_mask,transform,ct)
         input, transform = utils.rigid_registration(ct, input, parameter_file, default_value=patient['background'], log=logger)
     
         # Apply transformation to CBCT/MRI FOV mask
@@ -73,9 +97,6 @@ if __name__ == "__main__":
         if patient['defacing']:
             defacing_mask = utils.resample_image(defacing_mask,new_spacing=patient['resample'],log=logger)
         
-        # generate overview png
-        utils.generate_overview_stage1(ct,input,patient['output_dir'])
-        
         # Save registered,defaced CBCT/MRI and CT, input/MRI FOV mask and transform 
         if not os.path.isdir(patient['output_dir']):
             os.mkdir(patient['output_dir'])
@@ -95,3 +116,6 @@ if __name__ == "__main__":
         # convert rtstruct to nrrd
         if not ['struct_path']=='':
             utils.convert_rtstruct_to_nrrd(patient['struct_path'],patient['output_dir'],log=logger)
+            
+        # generate overview png
+        utils.generate_overview_stage1(ct,input,patient['output_dir'])
