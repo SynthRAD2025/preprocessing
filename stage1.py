@@ -77,7 +77,12 @@ if __name__ == "__main__":
         
         # Register CBCT/MRI to CT
         parameter_file = patient['registration']
-        input, transform = utils.rigid_registration(ct, input, parameter_file, default_value=patient['background'], log=logger)
+        if patient['reg_fovmask']:
+            logger.info('Registering input to CT using FOV mask...')
+            input, transform = utils.rigid_registration(ct, input, parameter_file, default_value=patient['background'], log=logger, mask=fov_mask)
+        else:
+            logger.info('Registering input to CT without FOV mask...')
+            input, transform = utils.rigid_registration(ct, input, parameter_file, default_value=patient['background'], log=logger)
     
         # Apply transformation to CBCT/MRI FOV mask
         fov_mask_reg = utils.apply_transform(fov_mask,transform,ct)

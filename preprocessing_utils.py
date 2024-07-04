@@ -990,9 +990,12 @@ def csv_to_dict(file):
         #if not a string parse file types correctly
         patients_dict[line[0]]['task'] = int(patients_dict[line[0]]['task'])
         patients_dict[line[0]]['background'] = float(patients_dict[line[0]]['background'])
-        patients_dict[line[0]]['defacing'] = True if patients_dict[line[0]]['defacing'] == 'True' else False
+        patients_dict[line[0]]['defacing'] = True if patients_dict[line[0]]['defacing'] == 'True' or patients_dict[line[0]]['defacing'] == 'TRUE' else False
         patients_dict[line[0]]['order'] = [int(i) for i in patients_dict[line[0]]['order'].strip('[]').split(',')]
         patients_dict[line[0]]['flip'] = [True if x == 'True' else False for x in patients_dict[line[0]]['flip'].strip('[]').split(',')]
+        patients_dict[line[0]]['intensity_shift'] = float(patients_dict[line[0]]['intensity_shift'])
+        patients_dict[line[0]]['reg_fovmask'] = True if patients_dict[line[0]]['reg_fovmask'] == 'True' or patients_dict[line[0]]['reg_fovmask'] == 'TRUE' else False
+        patients_dict[line[0]]['mr_overlap_correction'] = True if patients_dict[line[0]]['mr_overlap_correction'] == 'True' or patients_dict[line[0]]['mr_overlap_correction'] == 'TRUE' else False
         patients_dict[line[0]]['resample'] = [float(i) for i in patients_dict[line[0]]['resample'].strip('[]').split(',')]
         
     return patients_dict
