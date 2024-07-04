@@ -1,17 +1,15 @@
-import SimpleITK as sitk
-#import pyplastimatch
-import numpy as np
-import nibabel as nib
-from typing import List,Union
-from scipy.signal import find_peaks
-from totalsegmentator.python_api import totalsegmentator
-from scipy import ndimage
 import tempfile
 import shutil
 import os
 import matplotlib.pyplot as plt
 import csv
 import subprocess
+import SimpleITK as sitk
+import numpy as np
+import nibabel as nib
+from typing import Union
+from totalsegmentator.python_api import totalsegmentator
+from scipy import ndimage
 
 def read_image(image_path:str,log=False)->sitk.Image:
     """

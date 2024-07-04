@@ -119,7 +119,7 @@ if __name__ == "__main__":
         sitk.WriteTransform(transform,os.path.join(patient['output_dir'],'transform.tfm'))
         
         # convert rtstruct to nrrd
-        if not ['struct_path']=='':
+        if not patient['struct_path']=='':
             utils.convert_rtstruct_to_nrrd(patient['struct_path'],patient['output_dir'],log=logger)
             
         # generate overview png
