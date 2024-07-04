@@ -36,8 +36,8 @@ if __name__ == "__main__":
         # log patient details
         logger.info(f'Processing patient:\n Name: {pat} \n Input: {patient['input_path']} \n CT: {patient['ct_path']} \n Output: {patient['output_dir']}')
         
-        # Load input (CBCT or MRI) and CT as sitk images
-        input = utils.read_image(patient['input_path'],log=logger)
+        # Load input (CBCT or MRI) and CT as sitk images, if dicom provide path to directory, if other file type provide path to file
+        input = utils.read_image(patient['input_path'],log=logger)   
         ct = utils.read_image(patient['ct_path'],log=logger)
         
         # if necessary correct orientation of input/MRI (swap or flip axes)
@@ -48,7 +48,6 @@ if __name__ == "__main__":
             fov_mask = utils.get_mr_fov(input)
         if patient['task'] == 2:
             fov_mask = utils.get_cbct_fov(input,background=patient['background'],log=logger)
-        
         
         # Register CBCT/MRI to CT
         parameter_file = patient['registration']
@@ -74,6 +73,8 @@ if __name__ == "__main__":
         if patient['defacing']:
             defacing_mask = utils.resample_image(defacing_mask,new_spacing=patient['resample'],log=logger)
         
+        # generate overview png
+        utils.generate_overview_stage1(ct,input,patient['output_dir'])
         
         # Save registered,defaced CBCT/MRI and CT, input/MRI FOV mask and transform 
         if not os.path.isdir(patient['output_dir']):
@@ -90,3 +91,7 @@ if __name__ == "__main__":
         if patient['defacing']:
             utils.save_image(defacing_mask,os.path.join(patient['output_dir'],'defacing_mask.nii.gz'))
         sitk.WriteTransform(transform,os.path.join(patient['output_dir'],'transform.tfm'))
+        
+        # convert rtstruct to nrrd
+        if not ['struct_path']=='':
+            utils.convert_rtstruct_to_nrrd(patient['struct_path'],patient['output_dir'],log=logger)

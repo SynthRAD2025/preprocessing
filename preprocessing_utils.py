@@ -11,6 +11,7 @@ import shutil
 import os
 import matplotlib.pyplot as plt
 import csv
+import subprocess
 
 def read_image(image_path:str,log=False)->sitk.Image:
     """
@@ -23,9 +24,14 @@ def read_image(image_path:str,log=False)->sitk.Image:
     sitk.Image: The loaded image.
 
     """
-    image = sitk.ReadImage(image_path)
+    if os.path.isdir(image_path):
+        image = read_dicom_image(image_path,log)
+    elif os.path.isfile(image_path):   
+        image = sitk.ReadImage(image_path)
+    
     if log != False:
-        log.info(f'Image loaded from {image_path}')
+        log.info(f'Image sucessfully read from {image_path}')
+    
     return image
 
 def read_dicom_image(image_path:str,log=False)->sitk.Image:
@@ -43,7 +49,7 @@ def read_dicom_image(image_path:str,log=False)->sitk.Image:
     reader.SetFileNames(dicom_names)
     image = reader.Execute()
     if log != False:
-        log.info(f'DICOM image loaded from {image_path}')
+        log.info(f'DICOM image sucessfuly read from {image_path}')
     return image
 
 def save_image(image:sitk.Image, image_path:str,compression:bool=True,log=False):
@@ -58,22 +64,27 @@ def save_image(image:sitk.Image, image_path:str,compression:bool=True,log=False)
     if log != False:
         log.info(f'Image saved to {image_path}')
 
-# def convert_rtstruct_to_nrrd(rtstruct_path:str, nrrd_dir_path:str):
-#     """
-#     Converts an RTSTRUCT file to NRRD format.
+def convert_rtstruct_to_nrrd(rtstruct_path:str, output_dir:str,plastimatch_path=None,log=False):
+    """
+    Converts an RTSTRUCT file to NRRD format using plastimatch. plastimatch needs to be installed in the system
 
-#     Parameters:
-#     rtstruct_path (str): The path to the RTSTRUCT file.
-#     nrrd_dir_path (str): The directory path where the NRRD files will be saved.
+    Parameters:
+    rtstruct_path (str): The path to the RTSTRUCT file.
+    nrrd_dir_path (str): The directory path where the NRRD files will be saved.
+    plastimatch_path (str, optional): The path to the plastimatch executable. Defaults to None.
 
-#     Returns:
-#     None
-#     """
-#     convert_args_ct = {"input" :            rtstruct_path,
-#                         "output-prefix" :   nrrd_dir_path,
-#                         "prefix-format" :   'nrrd',
-#                         }
-#     pyplastimatch.convert(**convert_args_ct)
+    Returns:
+    None
+    """
+    output_dir = os.path.join(output_dir,'structures')
+    
+    if plastimatch_path == None:
+        command = ['plastimatch','convert','--input',rtstruct_path,'--output-prefix',output_dir,'--prefix-format','nrrd']
+    else:
+        command = [plastimatch_path,'convert','--input',rtstruct_path,'--output-prefix',output_dir,'--prefix-format','nrrd']
+    subprocess.run(command)
+    if log != False:
+        log.info(f'RT struct {rtstruct_path} converted, saved to {output_dir}')
 
 def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
     """
@@ -899,6 +910,46 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,output_
     
     plt.savefig(os.path.join(output_dir,'overview.png'),dpi=300,bbox_inches='tight')
     
+def generate_overview_stage1(ct:sitk.Image,input:sitk.Image,output_dir:str)->None:
+    """
+    Generate an overview PNG image showing slices from different orientations of the input CT and input image after stage 1 preprocessing.
+
+    Parameters:
+    ct (sitk.Image): The CT image.
+    input (sitk.Image): The input image.
+    output_dir (str): The directory to save the overview PNG image.
+
+    Returns:
+    None
+    """
+    
+    shape = np.shape(sitk.GetArrayFromImage(ct))
+    background_ct = np.percentile(sitk.GetArrayFromImage(ct), 0.1)
+    high_ct = np.percentile(sitk.GetArrayFromImage(ct), 99.9)
+    background_input = np.percentile(sitk.GetArrayFromImage(input), 0.1)
+    high_input = np.percentile(sitk.GetArrayFromImage(input), 99.9)
+
+    slice_sag = shape[2]//2
+    slice_cor = shape[1]//2
+    slice_ax = shape[0]//2
+    fig,ax = plt.subplots(3,3,figsize=(15,15))
+    ax[0,0].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[0,1].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[0,2].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,2].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
+
+    ax[1,0].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,1].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[1,2].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,2].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+
+    ax[2,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[2,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
+    ax[2,2].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    plt.savefig(os.path.join(output_dir,'overview_s1.png'),dpi=300,bbox_inches='tight')
+
 def read_csv_lines(file):
     """
     Reads a CSV file and returns a list of lines.
