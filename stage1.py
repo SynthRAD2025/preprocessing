@@ -2,6 +2,7 @@ import preprocessing_utils as utils
 import os 
 import SimpleITK as sitk
 import logging
+import sys
 
 if __name__ == "__main__":
 
@@ -22,9 +23,13 @@ if __name__ == "__main__":
 
     logger.info('Starting stage 1 preprocessing')
 
-    ## load pre-processing configuation from csv or json file
-    patient_dict = utils.csv_to_dict('/workspace/code/preprocessing/stage1_config.csv')
-    print(patient_dict)
+    ## load pre-processing configuration from .csv file (sys.argv[1])
+    file = sys.argv[1]
+    if file.endswith('.csv'):
+        patient_dict = utils.csv_to_dict(file)
+    else:
+        logger.error('Input file must be a csv file')
+        sys.exit(1)
 
     for pat in patient_dict:
         patient = patient_dict[pat]
@@ -66,10 +71,16 @@ if __name__ == "__main__":
         input = utils.resample_image(input,new_spacing=patient['resample'],log=logger)
         ct = utils.resample_image(ct,new_spacing=patient['resample'],log=logger)
         fov_mask_reg = utils.resample_image(fov_mask_reg,new_spacing=patient['resample'],log=logger)
-        defacing_mask = utils.resample_image(defacing_mask,new_spacing=patient['resample'],log=logger)
+        if patient['defacing']:
+            defacing_mask = utils.resample_image(defacing_mask,new_spacing=patient['resample'],log=logger)
         
         
         # Save registered,defaced CBCT/MRI and CT, input/MRI FOV mask and transform 
+        if not os.path.isdir(patient['output_dir']):
+            os.mkdir(patient['output_dir'])
+            logger.info('Creating output directory...')
+        else:
+            logger.warning('Output directory already exists. Overwriting existing files...')
         if patient['task'] == 1:
             utils.save_image(input,os.path.join(patient['output_dir'],'mr_s1.nii.gz'))
         if patient['task'] == 2:
