@@ -7,7 +7,7 @@ This repository contains the code for pre-processing the data for the [synthRAD2
     - **Resampling**: Images are resampled to a common voxel size.
 
 2. **Stage 2** contains all steps that are carried out for the entire dataset at once and includes the following steps:
-    - **Deformable Image Registration**: MR/CBCT images are deformably registered to the CT
+    - **Deformable image registration**: MR/CBCT images are deformably registered to the CT
      - **Cropping**: CBCT/CT/MR and structures are cropped to the same size.
      - **Validation**: The preprocessed data is validated to ensure that the preprocessing steps have been carried out correctly.
      - **Dataset creation**: The preprocessed data is seperated into training/validation and test datasets. Furthermore separate datasets for centers and tasks are created.
@@ -32,7 +32,11 @@ The code is organized in two main files: [stage1.py](./stage1.py) and [stage2.py
 
 ```python stage1.py config.csv```
 
-[config.csv](./stage1_config.csv) is a configuration file that contains the paths to the input data and the parameters for the preprocessing steps. The configuration file contains a header in the first row each further row contains configuration for a single patient. The configuration file should contain the following columns:
+## Stage 1 
+
+### Inputs
+
+[stage1_config.csv](./stage1_config.csv) is a configuration file that contains the paths to the input data and the parameters for the preprocessing steps. The configuration file contains a header in the first row each further row contains configuration for a single patient. The configuration file should contain the following columns:
 
 | column        | description           | parsed as|
 | ------------- |-------------| -------|
@@ -53,7 +57,28 @@ The code is organized in two main files: [stage1.py](./stage1.py) and [stage2.py
 | **mr_overlap_correction**| *True* if MR overlap correction (some centers have artificial override to match multiple scans) is required, *False* otherwise| bool |
 | **intensity_shift**| shifts the intensity of an image, usually 0, but can be required for CBCTs| float |
 
+### Outputs
 
+stage1.py generates the following outputs for each patient:
 
+- **ct_s1.nii.gz**: defaced (if HN) and resampled CT image
+- **mr_s1.nii.gz**: defaced (if HN), resampled and registered MR image (only for task 1 cases)
+- **cbct_s1.nii.gz**: defaced (if HN), resampled and registered CBCT image (only for task 2 cases)
+- **fov_s1.nii.gz**: FOV mask of input image (CBCT/MR) in CT frame of reference
+- **transform.tfm**: transformation file from input image to CT frame of reference
+- **overview.png**: overview image of the CT and input images (CBCT/MR)
 
+## Stage 2
+
+### Inputs
+stage2.py requires the following inputs:
+
+| column        | description           | parsed as|
+| ------------- |-------------| -------|
+| **ID**        | A unique patient ID in the synhtRAD2025 format: [Task][Region][Center][001-999].| str |
+| **task**      | *1* for Task 1 (MR-to-CT) and *2* for Task 2 (CBCT-to-CT)      |int|
+| **region**    |  *HN* for head and neck, *AB* for abdomen, *TH* for thorax  |  string |
+### Outputs
+stage2.py generates the following outputs for each patient:
+(work in progress)
 
