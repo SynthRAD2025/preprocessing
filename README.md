@@ -28,7 +28,7 @@ To convert RT structs to .nrrd files plastimatch is required. Plastimatch can be
 
 # Usage
 
-The code is organized in two main files: [stage1.py](./stage1.py) and [stage2.py](./stage2.py). The code can be run by executing the following command:
+The code is organized in two main files: [stage1.py](./stage1.py) and [stage2.py](./stage2.py). The code for stage 1 can be run by executing the following command:
 
 ```python stage1.py config.csv```
 
@@ -67,6 +67,14 @@ stage1.py generates the following outputs for each patient:
 - **fov_s1.nii.gz**: FOV mask of input image (CBCT/MR) in CT frame of reference
 - **transform.tfm**: transformation file from input image to CT frame of reference
 - **overview.png**: overview image of the CT and input images (CBCT/MR)
+
+### Troubleshooting
+
+#### Registration
+In case the registration fails, the following steps can be taken:
+- If the script crashes during registration, try changing the registration parameter file and use a parameter file with more or less sampling points (indicated by the number in the filename).
+- If the script does not crash, but images are not registered correctly, try changing the registration parameter file. If you are currently using `param_rigid_small_*.txt`, try using a `param_rigid_large_*.txt` parameter file (or the other way around).
+
 
 ## Stage 2
 
