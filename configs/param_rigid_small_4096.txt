@@ -107,7 +107,7 @@
 // which usually works well. In case of unusual high-resolution images
 // (eg histology) it is necessary to increase this value a bit, to the size
 // of the "smallest visible structure" in the image:
-(MaximumStepLength 60.0 20.0 5.0 2.0)
+(MaximumStepLength 20.0 10.0 2.0 2.0)
 //(MaximumStepLengthRatio 0.2 0.5 1 1)
 (SP_A 10000.000000 1000.000000 100.000000 1.000000 )
 //(Sp_a 1000 500 500 200)
@@ -120,7 +120,7 @@
 // With an AdaptiveStochasticGradientDescent optimizer,
 // in combination with the two options below, around 2000
 // samples may already suffice.
-(NumberOfSpatialSamples 512)
+(NumberOfSpatialSamples 4096)
 (CheckNumberOfSamples "true")
 //(NumberOfSpatialSamples 2048)
 
@@ -132,7 +132,7 @@
 (ImageSampler "Random")
 //(ImageSampler "Full")
 //(ImageSampler "Grid")
-(SampleGridSpacing 4 4 4 2)
+(SampleGridSpacing 2 2 2 2)
 (MaximumNumberOfSamplingAttempts 2000)
 (RequiredRatioOfValidSamples 0.045)
 

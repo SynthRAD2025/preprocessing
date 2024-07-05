@@ -100,7 +100,7 @@
 // 200-500 works usually fine for rigid registration.
 // For more robustness, you may increase this to 1000-2000.
 //(MaximumNumberOfIterations 1500 1500 1000 1000)
-(MaximumNumberOfIterations 5000 5000 1000 1000)
+(MaximumNumberOfIterations 2500 2500 1000 500)
 
 
 // The step size of the optimizer, in mm. By default the voxel size is used.
