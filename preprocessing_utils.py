@@ -170,7 +170,7 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,
     elastixImageFilter.Execute()
     
     moving_def = elastixImageFilter.GetResultImage()
-    transform = elastixImageFilter.GetTransformParameterMap(0)
+    transform = elastixImageFilter.GetTransformParameterMap()[0]
     
     os.chdir(current_directory)
     shutil.rmtree(temp_dir)

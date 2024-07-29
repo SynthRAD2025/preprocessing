@@ -40,12 +40,14 @@ if __name__ == "__main__":
             if patient['task'] == 1:
                 if (os.path.isfile(os.path.join(patient['output_dir'],'mr_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_deformed_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
                     logger.info(f'Patient {i} already pre-processed. Skipping...')
                     continue
             elif patient['task'] == 2:
                 if (os.path.isfile(os.path.join(patient['output_dir'],'cbct_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_deformed_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
                     logger.info(f'Patient {i} already pre-processed. Skipping...')
                     continue
@@ -70,17 +72,22 @@ if __name__ == "__main__":
         #Generate patient outline
         mask = utils.segment_outline(input,patient['mask_thresh'])
         mask = utils.postprocess_outline(mask,fov)
+        utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
         
-        #Crop images using fov mask from stage 1
-        input = utils.crop_image(input,mask)
-        ct = utils.crop_image(ct,mask)
-        mask = utils.crop_image(mask,mask)
-        fov = utils.crop_image(fov,mask)
+        
+        #Crop images using mask generated above
+        input = utils.crop_image(input,fov)
+        ct = utils.crop_image(ct,fov)
+        mask = utils.crop_image(mask,fov)
+        fov = utils.crop_image(fov,fov)
         
         #deform CT to match input
-        ct_deformed,_ = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
+        ct_deformed, transform = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
         
-        #Save cropped images
+        #apply fov mask to deformed ct
+        ct_deformed = utils.mask_image(ct_deformed,fov,-1000)
+        
+        #Save cropped images and transform
         if patient['task'] == 1:
             utils.save_image(input,os.path.join(patient['output_dir'],'mr_s2.nii.gz'))
         if patient['task'] == 2:
@@ -89,6 +96,7 @@ if __name__ == "__main__":
         utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
         utils.save_image(fov,os.path.join(patient['output_dir'],'fov_s2.nii.gz'))
         utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_deformed_s2.nii.gz'))
+        sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
         #Generate png overview
         utils.generate_overview_png(ct,input,mask,patient['output_dir'])
