@@ -2,71 +2,94 @@ import preprocessing_utils as utils
 import os 
 import SimpleITK as sitk
 import logging
+import sys
 
-## set up logging to console and file
-log_file = 'stage2.log'
+# Set this to true if you want to skip already pre-processsed patients (checks if output files already exists)
+skip_existing = True
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO) 
+if __name__ == "__main__":
+    ## set up logging to console and file
+    log_file = 'stage2.log'
 
-file_handler = logging.FileHandler(log_file,mode = 'a')
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO) 
 
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    file_handler = logging.FileHandler(log_file,mode = 'a')
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 
-logger.info('Starting stage 2 preprocessing')
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
-patient_list = []
+    logger.info('Starting stage 2 preprocessing')
 
-## THIS SECTION HAS TO BE MODIFIED FOR EACH CENTER ##
+    ## load pre-processing configuration from .csv file (sys.argv[1])
+    file = sys.argv[1]
+    if file.endswith('.csv'):
+        patient_dict = utils.csv_to_dict(file)
+    else:
+        logger.error('Input file must be a csv file')
+        sys.exit(1)
 
-## EXAMPLE for a single patient, for an entire dataset use a loop to populate patient_list with a dict for each patient
-name = '2THA203'
-region = 'Thorax'
-
-patient = {}
-patient['name'] = f'{name}'
-patient['input'] = f'/workspace/data/1%/Task2/{region}/{name}/cbct_s1.nii.gz'
-patient['ct'] = f'/workspace/data/1%/Task2/{region}/{name}/ct_s1.nii.gz'
-patient['fov'] = f'/workspace/data/1%/Task2/{region}/{name}/fov_s1.nii.gz'
-patient['output_dir'] = f'/workspace/data/1%/Task2/{region}/{name}/'
-# the following keys are usually the same for all patients from the same anatomy and center
-patient['task'] = 2 
-patient['background'] = -1000
-patient['threshold'] = 0.2
-
-patient_list.append(patient)
-## END OF MODIFICATION SECTION ##
-
-for patient in patient_list:
-    #Read Files
-    input = sitk.ReadImage(patient['input'])
-    ct = sitk.ReadImage(patient['ct'])
-    fov = sitk.ReadImage(patient['fov'])
-    
-    #Generate patient outline
-    mask = utils.segment_outline(input,patient['threshold'])
-    mask = utils.postprocess_outline(mask,fov)
-    
-    #Crop images using fov mask from stage 1
-    input = utils.crop_image(input,mask)
-    ct = utils.crop_image(ct,mask)
-    mask = utils.crop_image(mask,mask)
-    fov = utils.crop_image(fov,mask)
-    
-    #Save cropped images
-    if patient['task'] == 1:
-        utils.save_image(input,patient['output_dir'] + 'mr_s2.nii.gz')
-    if patient['task'] == 2:
-        utils.save_image(input,patient['output_dir'] + 'cbct_s2.nii.gz')
-    utils.save_image(ct,patient['output_dir'] + 'ct_s2.nii.gz')
-    utils.save_image(mask,patient['output_dir'] + 'mask_s2.nii.gz')
-    utils.save_image(fov,patient['output_dir'] + 'fov_s2.nii.gz')
-    
-    #Generate png overview
-    utils.generate_overview_png(ct,input,mask,patient['output_dir'])
+    for i in patient_dict:
+        patient = patient_dict[i]
+        # check if output files already exist and skip if flag is set
+        if skip_existing:
+            if patient['task'] == 1:
+                if (os.path.isfile(os.path.join(patient['output_dir'],'mr_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
+                    logger.info(f'Patient {i} already pre-processed. Skipping...')
+                    continue
+            elif patient['task'] == 2:
+                if (os.path.isfile(os.path.join(patient['output_dir'],'cbct_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
+                    logger.info(f'Patient {i} already pre-processed. Skipping...')
+                    continue
+        
+        # log patient details
+        logger.info(f'''Processing case {i}:
+                            Output_dir: {patient['output_dir']}''')
+        
+        #Read Files
+        if patient['task'] == 1:
+            input = utils.read_image(os.path.join(patient['output_dir'],'mr_s1.nii.gz'),log=logger)
+        if patient['task'] == 2:
+            input = utils.read_image(os.path.join(patient['output_dir'],'cbct_s1.nii.gz'),log=logger)
+        else:
+            logger.error('Task not valid')
+            sys.exit(1)
+        ct = utils.read_image(os.path.join(patient['output_dir'],'ct_s1.nii.gz'),log=logger)    
+        fov = utils.read_image(os.path.join(patient['output_dir'],'fov_s1.nii.gz'),log=logger)
+        if patient['defacing_correction'] == True:
+            face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
+        
+        #Generate patient outline
+        mask = utils.segment_outline(input,patient['mask_thresh'])
+        mask = utils.postprocess_outline(mask,fov)
+        
+        #Crop images using fov mask from stage 1
+        input = utils.crop_image(input,mask)
+        ct = utils.crop_image(ct,mask)
+        mask = utils.crop_image(mask,mask)
+        fov = utils.crop_image(fov,mask)
+        
+        #deform CT to match input
+        ct_deformed,_ = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
+        
+        #Save cropped images
+        if patient['task'] == 1:
+            utils.save_image(input,os.path.join(patient['output_dir'],'mr_s2.nii.gz'))
+        if patient['task'] == 2:
+            utils.save_image(input,os.path.join(patient['output_dir'],'cbct_s2.nii.gz'))
+        utils.save_image(ct,os.path.join(patient['output_dir'],'ct_s2.nii.gz'))
+        utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
+        utils.save_image(fov,os.path.join(patient['output_dir'],'fov_s2.nii.gz'))
+        utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_deformed_s2.nii.gz'))
+        
+        #Generate png overview
+        utils.generate_overview_png(ct,input,mask,patient['output_dir'])
    

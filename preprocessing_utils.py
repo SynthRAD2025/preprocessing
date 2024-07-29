@@ -150,6 +150,35 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     
     return registered_image,inverse_transform
 
+def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value=0, log=False)->Union[sitk.Image,sitk.Transform]:
+    temp_dir = tempfile.mkdtemp()
+    current_directory = os.getcwd()
+    os.chdir(temp_dir)
+
+    parameter = sitk.ReadParameterFile(parameter_file)
+
+    # Perform registration based on parameter file
+    elastixImageFilter = sitk.ElastixImageFilter()
+    elastixImageFilter.SetParameterMap(parameter)
+    elastixImageFilter.SetFixedImage(fixed)  # due to FOV differences CT first registered to MR an inverted in the end
+    elastixImageFilter.SetMovingImage(moving)
+    if mask != None:
+        elastixImageFilter.SetFixedMask(mask)
+    elastixImageFilter.LogToConsoleOff()
+    elastixImageFilter.LogToFileOff()
+    elastixImageFilter.SetNumberOfThreads(16)
+    elastixImageFilter.Execute()
+    
+    moving_def = elastixImageFilter.GetResultImage()
+    transform = elastixImageFilter.GetTransformParameterMap(0)
+    
+    os.chdir(current_directory)
+    shutil.rmtree(temp_dir)
+    
+    if log != False:
+        log.info(f'Deformable registration succesfull using parameter file {parameter_file}')
+    
+    return moving_def,transform
 
 def rigid_registration_v2(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
     """
@@ -284,19 +313,6 @@ def translation_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file
     
     return registered_image, transform_itk
 
-def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter)->Union[sitk.Image,sitk.Transform]:
-    
-    # Perform registration based on parameter file
-    elastixImageFilter = sitk.ElastixImageFilter()
-    elastixImageFilter.SetParameterMap(parameter)
-    elastixImageFilter.SetFixedImage(fixed)  # due to FOV differences CT first registered to MR an inverted in the end
-    elastixImageFilter.SetMovingImage(moving)
-    elastixImageFilter.LogToConsoleOn()
-    elastixImageFilter.LogToFileOff()
-    elastixImageFilter.Execute()
-    deformed = elastixImageFilter.GetResultImage()
-
-    return deformed
 
 def correct_image_properties(input_image:sitk.Image, order=[0,1,2], flip=[False,False,False], intensity_shift=None, data_type=None, mr_overlap_correction=False, log=False):
     """
@@ -596,26 +612,27 @@ def apply_transform(image: sitk.Image, transform: sitk.Transform, ref_image:sitk
     transformed_image = resampler.Execute(image)
     return transformed_image
 
-def crop_image(image:sitk.Image, bbox:tuple,dilation:int)->sitk.Image:
-    """
-    Crop the input image based on the given bounding box and dilation.
+## Why did i do this?
+# def crop_image(image:sitk.Image, bbox:tuple,dilation:int)->sitk.Image:
+#     """
+#     Crop the input image based on the given bounding box and dilation.
 
-    Parameters:
-    image (sitk.Image): The input image to be cropped.
-    bbox (tuple): The bounding box coordinates in the format (x_min, y_min, z_min, x_max, y_max, z_max).
-    dilation (int): The amount of dilation to be applied to the bounding box.
+#     Parameters:
+#     image (sitk.Image): The input image to be cropped.
+#     bbox (tuple): The bounding box coordinates in the format (x_min, y_min, z_min, x_max, y_max, z_max).
+#     dilation (int): The amount of dilation to be applied to the bounding box.
 
-    Returns:
-    sitk.Image: The cropped image.
+#     Returns:
+#     sitk.Image: The cropped image.
 
-    """
-    start_index = [int(bbox[0]-dilation), int(bbox[1]-dilation), int(bbox[2]-dilation)]
-    size = [int(bbox[3] - bbox[0]+dilation*2), int(bbox[4] - bbox[1]+dilation*2), int(bbox[5] - bbox[2] +dilation*2)]
-    roi_filter = sitk.RegionOfInterestImageFilter()
-    roi_filter.SetIndex(start_index)
-    roi_filter.SetSize(size)
-    cropped_image = roi_filter.Execute(image)
-    return cropped_image
+#     """
+#     start_index = [int(bbox[0]-dilation), int(bbox[1]-dilation), int(bbox[2]-dilation)]
+#     size = [int(bbox[3] - bbox[0]+dilation*2), int(bbox[4] - bbox[1]+dilation*2), int(bbox[5] - bbox[2] +dilation*2)]
+#     roi_filter = sitk.RegionOfInterestImageFilter()
+#     roi_filter.SetIndex(start_index)
+#     roi_filter.SetSize(size)
+#     cropped_image = roi_filter.Execute(image)
+#     return cropped_image
 
 def get_bounding_box(image:sitk.Image)->tuple:
     """
@@ -985,15 +1002,57 @@ def csv_to_dict(file):
         patients_dict[line[0]] = {}
         for i in range(1, len(line)):
             patients_dict[line[0]][lines[0][i]] = line[i]
-        #if not a string parse file types correctly
-        patients_dict[line[0]]['task'] = int(patients_dict[line[0]]['task'])
-        patients_dict[line[0]]['background'] = float(patients_dict[line[0]]['background'])
-        patients_dict[line[0]]['defacing'] = True if patients_dict[line[0]]['defacing'] == 'True' or patients_dict[line[0]]['defacing'] == 'TRUE' else False
-        patients_dict[line[0]]['order'] = [int(i) for i in patients_dict[line[0]]['order'].strip('[]').split(',')]
-        patients_dict[line[0]]['flip'] = [True if x == 'True' else False for x in patients_dict[line[0]]['flip'].strip('[]').split(',')]
-        patients_dict[line[0]]['intensity_shift'] = float(patients_dict[line[0]]['intensity_shift'])
-        patients_dict[line[0]]['reg_fovmask'] = True if patients_dict[line[0]]['reg_fovmask'] == 'True' or patients_dict[line[0]]['reg_fovmask'] == 'TRUE' else False
-        patients_dict[line[0]]['mr_overlap_correction'] = True if patients_dict[line[0]]['mr_overlap_correction'] == 'True' or patients_dict[line[0]]['mr_overlap_correction'] == 'TRUE' else False
-        patients_dict[line[0]]['resample'] = [float(i) for i in patients_dict[line[0]]['resample'].strip('[]').split(',')]
-        
+        try:
+            patients_dict[line[0]]['task'] = int(patients_dict[line[0]]['task'])
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['background'] = float(patients_dict[line[0]]['background'])
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['defacing'] = True if patients_dict[line[0]]['defacing'] == 'True' or patients_dict[line[0]]['defacing'] == 'TRUE' else False
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['order'] = [int(i) for i in patients_dict[line[0]]['order'].strip('[]').split(',')]
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['flip'] = [True if x == 'True' else False for x in patients_dict[line[0]]['flip'].strip('[]').split(',')]
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['intensity_shift'] = float(patients_dict[line[0]]['intensity_shift'])
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['reg_fovmask'] = True if patients_dict[line[0]]['reg_fovmask'] == 'True' or patients_dict[line[0]]['reg_fovmask'] == 'TRUE' else False
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['mr_overlap_correction'] = True if patients_dict[line[0]]['mr_overlap_correction'] == 'True' or patients_dict[line[0]]['mr_overlap_correction'] == 'TRUE' else False
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['resample'] = [float(i) for i in patients_dict[line[0]]['resample'].strip('[]').split(',')]
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['mask_thresh'] = float(patients_dict[line[0]]['mask_thresh'])
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['defacing_correction'] = True if patients_dict[line[0]]['defacing_correction'] == 'True' or patients_dict[line[0]]['defacing_correction'] == 'TRUE' else False
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['IS_correction'] = True if patients_dict[line[0]]['IS_correction'] == 'True' or patients_dict[line[0]]['IS_correction'] == 'TRUE' else False
+        except:
+            pass
+        try:
+            patients_dict[line[0]]['cone_correction'] = True if patients_dict[line[0]]['cone_correction'] == 'True' or patients_dict[line[0]]['cone_correction'] == 'TRUE' else False
+        except:
+            pass
+
     return patients_dict
