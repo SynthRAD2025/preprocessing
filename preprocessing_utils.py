@@ -151,6 +151,9 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     return registered_image,inverse_transform
 
 def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value=0, log=False)->Union[sitk.Image,sitk.Transform]:
+    if log != False:
+        log.info(f'Starting deformable registration using parameter file {parameter_file}')
+        
     temp_dir = tempfile.mkdtemp()
     current_directory = os.getcwd()
     os.chdir(temp_dir)
@@ -176,143 +179,9 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,
     shutil.rmtree(temp_dir)
     
     if log != False:
-        log.info(f'Deformable registration succesfull using parameter file {parameter_file}')
+        log.info(f'Deformable registration succesfull!')
     
     return moving_def,transform
-
-def rigid_registration_v2(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False)->Union[sitk.Image,sitk.Transform]:
-    """
-    Perform rigid registration between a fixed image and a moving image using the given parameter file. This function does not invert the transform (moving gets registered to fixed).
-    
-    Parameters:
-        fixed (sitk.Image): The fixed image to register.
-        moving (sitk.Image): The moving image to register.
-        parameter_file: The parameter file for the registration.
-        mask: Optional mask image to be used during registration.
-        default_value: Default pixel value for the resampled image.
-        log: Flag indicating whether to log information about the registration.
-
-    Returns:
-        Tuple[sitk.Image, sitk.Transform]: A tuple containing the registered image and the transform used for registration.
-    
-    """
-    temp_dir = tempfile.mkdtemp()
-    current_directory = os.getcwd()
-    os.chdir(temp_dir)
-    
-    parameter = sitk.ReadParameterFile(parameter_file)
-    
-    # Perform registration based on parameter file
-    elastixImageFilter = sitk.ElastixImageFilter()
-    elastixImageFilter.SetParameterMap(parameter)
-    elastixImageFilter.SetFixedImage(fixed)  # due to FOV differences CT first registered to MR an inverted in the end
-    elastixImageFilter.SetMovingImage(moving)
-    #if mask != None:
-        #elastixImageFilter.SetMovingMask(mask)
-    elastixImageFilter.LogToConsoleOn()
-    elastixImageFilter.LogToFileOff()
-    elastixImageFilter.Execute()
-    elastixImageFilter.SetOutputDirectory(temp_dir)
-
-    # convert to itk transform format
-    transform = elastixImageFilter.GetTransformParameterMap(0)
-    x = transform.values()
-    center = np.array((x[0])).astype(np.float64)
-    rigid = np.array((x[22])).astype(np.float64)
-    transform_itk = sitk.Euler3DTransform()
-    transform_itk.SetParameters(rigid)
-    transform_itk.SetCenter(center)
-    transform_itk.SetComputeZYX(False)
-
-    #convert elastix to itk format
-
-    # save itk transform to correct MR mask later
-    #transform_itk.WriteTransform(output)
-    #transform_itk.WriteTransform(str('registration_parameters.txt'))
-
-    ##invert transform to get MR registered to CT
-    # inverse_transform = transform_itk.GetInverse()
-
-    ##transform moving image
-    resample = sitk.ResampleImageFilter()
-    resample.SetReferenceImage(fixed)
-    resample.SetTransform(transform_itk)
-    resample.SetInterpolator(sitk.sitkLinear)
-    resample.SetDefaultPixelValue(default_value)
-    registered_image = resample.Execute(moving)
-    os.chdir(current_directory)
-    shutil.rmtree(temp_dir)
-    if log != False:
-        log.info(f'Rigid registration performed using parameter file {parameter_file}')
-    
-    return registered_image,transform_itk
-
-def translation_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value = 0,log=False):
-    """
-    Perform translation-based image registration using the Elastix library.
-
-    Args:
-        fixed (sitk.Image): The fixed image to register.
-        moving (sitk.Image): The moving image to register.
-        parameter_file (str): The path to the parameter file for Elastix registration.
-        mask (sitk.Image, optional): The mask to apply during registration. Defaults to None.
-        default_value (float, optional): The default pixel value for the registered image. Defaults to 0.
-        log (bool, optional): Whether to log the registration process. Defaults to False.
-
-    Returns:
-        tuple: A tuple containing the registered image (sitk.Image) and the transformation (sitk.TranslationTransform).
-    """
-    
-    temp_dir = tempfile.mkdtemp()
-    current_directory = os.getcwd()
-    os.chdir(temp_dir)
-
-    parameter = sitk.ReadParameterFile(parameter_file)
-
-    # Perform registration based on parameter file
-    elastixImageFilter = sitk.ElastixImageFilter()
-    elastixImageFilter.SetParameterMap(parameter)
-    elastixImageFilter.SetFixedImage(moving)  # due to FOV differences CT first registered to MR an inverted in the end
-    elastixImageFilter.SetMovingImage(fixed)
-    if mask != None:
-        elastixImageFilter.SetFixedMask(mask)
-    elastixImageFilter.LogToConsoleOn()
-    elastixImageFilter.LogToFileOff()
-    elastixImageFilter.Execute()
-    elastixImageFilter.SetOutputDirectory(temp_dir)
-
-    # convert to itk transform format
-    # transform = elastixImageFilter.GetTransformParameterMap(0)
-    # x = transform.values()
-    # center = np.array((x[0])).astype(np.float64)
-    # rigid = np.array((x[22])).astype(np.float64)
-    # transform_itk = sitk.Euler3DTransform()
-    # transform_itk.SetParameters(rigid)
-    # transform_itk.SetCenter(center)
-    # transform_itk.SetComputeZYX(False)
-
-    #convert elastix to itk format
-    transform = elastixImageFilter.GetTransformParameterMap(0)
-    x = transform.values()
-    translation = np.array((x[-2])).astype(np.float64)
-    transform_itk = sitk.TranslationTransform(3)
-    transform_itk.SetParameters(translation)
-
-    #invert transform to get MR registered to CT
-    transform_itk = transform_itk.GetInverse()
-
-    ##transform moving image
-    resample = sitk.ResampleImageFilter()
-    resample.SetReferenceImage(fixed)
-    resample.SetTransform(transform_itk)
-    resample.SetInterpolator(sitk.sitkLinear)
-    resample.SetDefaultPixelValue(default_value)
-    registered_image = resample.Execute(moving)
-    os.chdir(current_directory)
-    shutil.rmtree(temp_dir)
-    
-    return registered_image, transform_itk
-
 
 def correct_image_properties(input_image:sitk.Image, order=[0,1,2], flip=[False,False,False], intensity_shift=None, data_type=None, mr_overlap_correction=False, log=False):
     """
@@ -486,27 +355,28 @@ def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image,log=False)->sitk.Image
         log.info(f'Defacing mask generated with following parameters: x_brain = {x_brain}, y_brain = {y_brain}, x_skull = {x_skull}, y_skull = {y_skull}')
     return defacing_mask
 
-def segment_outline(ct_image:sitk.Image,fast=False)->sitk.Image:
-    """
-    Segment the patient outline from a CT/CBCT image using totalsegmentator.
+# this is not used
+# def segment_outline(ct_image:sitk.Image,fast=False,log=False)->sitk.Image:
+#     """
+#     Segment the patient outline from a CT/CBCT image using totalsegmentator.
 
-    Parameters:
-    - ct_image (sitk.Image): The input CT image.
-    - fast (bool): Whether to use fast mode for segmentation. Default is False.
+#     Parameters:
+#     - ct_image (sitk.Image): The input CT image.
+#     - fast (bool): Whether to use fast mode for segmentation. Default is False.
 
-    Returns:
-    - sitk.Image: The segmented patient outline image.
-    """
-    ct_nib = sitk_to_nib(ct_image)
-    segmentation = totalsegmentator(ct_nib,task='body',fast=fast,output=None,quiet=True)
-    structures = nib_to_sitk(segmentation)
-    structures_np = sitk.GetArrayFromImage(structures)
-    outline_np = np.copy(structures_np)
-    outline_np[outline_np!=0]=1
+#     Returns:
+#     - sitk.Image: The segmented patient outline image.
+#     """
+#     ct_nib = sitk_to_nib(ct_image)
+#     segmentation = totalsegmentator(ct_nib,task='body',fast=fast,output=None,quiet=True)
+#     structures = nib_to_sitk(segmentation)
+#     structures_np = sitk.GetArrayFromImage(structures)
+#     outline_np = np.copy(structures_np)
+#     outline_np[outline_np!=0]=1
     
-    outline = sitk.GetImageFromArray(outline_np)
-    outline.CopyInformation(structures)
-    return outline
+#     outline = sitk.GetImageFromArray(outline_np)
+#     outline.CopyInformation(structures)
+#     return outline
 
 def get_cbct_fov(cbct:sitk.Image,background:int=0,log=False)->sitk.Image:
     """
@@ -733,7 +603,7 @@ def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False)->sitk.Image:
         log.info(f'Image resampled to new spacing {new_spacing}')
     return resampled_image
 
-def segment_outline(input:sitk.Image,threshold:float=0.30)->sitk.Image:
+def segment_outline(input:sitk.Image,threshold:float=0.30,log=False)->sitk.Image:
     """
     Segment the outline of a given input image.
 
@@ -781,9 +651,12 @@ def segment_outline(input:sitk.Image,threshold:float=0.30)->sitk.Image:
     mask_filled.CopyInformation(mask)
     mask_filled = sitk.Cast(mask_filled, sitk.sitkUInt8)
 
+    if log != False:
+        log.info(f'Patient outline segmented using threshold {threshold}')
+    
     return mask_filled
 
-def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,IS_correction=None, defacing_correction = None, cone_correction=None)->sitk.Image:
+def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,IS_correction=None, defacing_correction = None, cone_correction=None,log=False)->sitk.Image:
     """
     Postprocesses the input mask by dilating it and multiplying it with the field of view (FOV) image.
 
@@ -799,6 +672,21 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
     - mask_final (sitk.Image): The postprocessed mask image.
 
     """
+    if log != False:
+        if IS_correction != None:
+            IS_correction_str = True
+        else:
+            IS_correction_str = False
+        if defacing_correction != None:
+            defacing_correction_str = True
+        else:
+            defacing_correction_str = False
+        if cone_correction != None:
+            cone_correction_str = True
+        else:
+            cone_correction_str = False
+            
+        log.info(f'Starting postprocessing of patient outline mask with IS_correction = {IS_correction_str}, defacing_correction = {defacing_correction_str}, cone_correction = {cone_correction_str}')
     # dilate mask 
     dilate = sitk.BinaryDilateImageFilter()
     dilate.SetKernelType(sitk.sitkBall)
@@ -880,6 +768,30 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     image_cropped = cropper.Execute(image)
     
     return image_cropped
+
+def warp_structure(structure:sitk.Image,transform:str,log=False):
+    if log != False:
+        log.info(f'Warping structure using transform {transform}...')
+    # read transform and change interpolator to nearest neighbor
+    transform = sitk.ReadParameterFile(transform)
+    transform['FinalBSplineInterpolationOrder']='0'  
+
+    # create bspline transformix filter
+    transformer = sitk.TransformixImageFilter()
+    transformer.SetTransformParameterMap(transform)
+    transformer.LogToConsoleOn()
+    transformer.LogToFileOff()
+    transformer.SetMovingImage(structure)
+    transformer.Execute()
+    transformed_mask = transformer.GetResultImage()
+    
+    ## post-process mask
+    transformed_mask = sitk.Threshold(sitk.Cast(transformed_mask, sitk.sitkUInt16),0,1)
+    transformed_mask = sitk.BinaryDilate(transformed_mask, (4,4,4), sitk.sitkBall)
+    transformed_mask = sitk.BinaryErode(transformed_mask, (4,4,4),sitk.sitkBall)
+    
+    return transformed_mask
+
 
 def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,output_dir:str)->None:
     """

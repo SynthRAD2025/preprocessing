@@ -63,6 +63,6 @@
 //(WritePyramidImagesAfterEachResolution "true")
 
 (DefaultPixelValue -1000)
-(WriteResultImage "true")
+(WriteResultImage "false")
 (ResultImagePixelType "short")
 (ResultImageFormat "nii.gz")

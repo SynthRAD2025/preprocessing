@@ -5,7 +5,7 @@ import logging
 import sys
 
 # Set this to true if you want to skip already pre-processsed patients (checks if output files already exists)
-skip_existing = True
+skip_existing = False
 
 if __name__ == "__main__":
     ## set up logging to console and file
@@ -70,9 +70,24 @@ if __name__ == "__main__":
             face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
         
         #Generate patient outline
-        mask = utils.segment_outline(input,patient['mask_thresh'])
-        mask = utils.postprocess_outline(mask,fov)
-        utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
+        mask = utils.segment_outline(input,patient['mask_thresh'],log=logger)
+        
+        if patient['defacing_correction']:
+            defacing_correction = os.path.join(patient['output_dir'],'defacing_mask.nii.gz')
+            defacing_correction = utils.read_image(defacing_correction,log=logger)
+        else:
+            defacing_correction = None
+        
+        if patient['IS_correction']:
+            IS_correction = 10
+        else:
+            IS_correction = None
+        
+        mask = utils.postprocess_outline(mask,
+                                         fov,
+                                         defacing_correction=defacing_correction,
+                                         IS_correction=IS_correction,
+                                         log=logger)
         
         
         #Crop images using mask generated above
@@ -86,6 +101,8 @@ if __name__ == "__main__":
         
         #apply fov mask to deformed ct
         ct_deformed = utils.mask_image(ct_deformed,fov,-1000)
+        
+        #warp structures
         
         #Save cropped images and transform
         if patient['task'] == 1:
