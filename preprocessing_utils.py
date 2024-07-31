@@ -769,8 +769,8 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     
     return image_cropped
 
-def warp_structure(structure:sitk.Image,transform:str,log=False):
-    if log != False:
+def warp_structure(structure:sitk.Image,transform:str,log=None):
+    if log != None:
         log.info(f'Warping structure using transform {transform}...')
     # read transform and change interpolator to nearest neighbor
     transform = sitk.ReadParameterFile(transform)
@@ -785,7 +785,7 @@ def warp_structure(structure:sitk.Image,transform:str,log=False):
     transformer.Execute()
     transformed_mask = transformer.GetResultImage()
     
-    ## post-process mask
+    ## post-process mask to slightly smooth the edges
     transformed_mask = sitk.Threshold(sitk.Cast(transformed_mask, sitk.sitkUInt16),0,1)
     transformed_mask = sitk.BinaryDilate(transformed_mask, (4,4,4), sitk.sitkBall)
     transformed_mask = sitk.BinaryErode(transformed_mask, (4,4,4),sitk.sitkBall)

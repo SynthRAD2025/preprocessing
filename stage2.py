@@ -69,7 +69,7 @@ if __name__ == "__main__":
         if patient['defacing_correction'] == True:
             face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
         
-        #Generate patient outline
+        #Generate patient outline and postprocess it
         mask = utils.segment_outline(input,patient['mask_thresh'],log=logger)
         
         if patient['defacing_correction']:
@@ -102,7 +102,19 @@ if __name__ == "__main__":
         #apply fov mask to deformed ct
         ct_deformed = utils.mask_image(ct_deformed,fov,-1000)
         
-        #warp structures
+        #preprocess structures
+        structures = os.listdir(os.path.join(patient['output_dir'],'structures'))
+        spacing = ct.GetSpacing()
+        for struct in structures:
+            struct_path = os.path.join(patient['output_dir'],struct)
+            struct = utils.read_image(struct_path,log=logger)
+            struct = utils.resample_image(struct,spacing)
+            struct = utils.crop_image(struct,fov)
+            struct = utils.mask_image(struct,fov,0)
+            struct_deformed = utils.warp_structure(struct,transform,log=logger)
+            utils.save_image(struct,os.path.join(patient['output_dir'],struct))
+            utils.save_image(struct_deformed,os.path.join(patient['output_dir'],struct.strip()+'_deformed'))
+        
         
         #Save cropped images and transform
         if patient['task'] == 1:
