@@ -59,9 +59,12 @@ if __name__ == "__main__":
             logger.error('Task not valid')
             sys.exit(1)
         ct = utils.read_image(os.path.join(patient['output_dir'],'ct_s1.nii.gz'),log=logger)    
-        fov = utils.read_image(os.path.join(patient['output_dir'],'fov_s1.nii.gz'),log=logger)
+        fov_s1 = utils.read_image(os.path.join(patient['output_dir'],'fov_s1.nii.gz'),log=logger)
         if patient['defacing_correction'] == True:
             face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
+        
+        #Perform cone correction for fov mask
+        fov_s1 = utils.cone_correction(fov_s1,log=logger)
         
         #Generate patient outline and postprocess it
         mask = utils.segment_outline(input,patient['mask_thresh'],log=logger)
@@ -75,20 +78,20 @@ if __name__ == "__main__":
         else:
             IS_correction = None
         mask = utils.postprocess_outline(mask,
-                                         fov,
+                                         fov_s1,
                                          defacing_correction=defacing_correction,
                                          IS_correction=IS_correction,
                                          log=logger)
         
-        
         #Crop images using mask generated above
-        input = utils.crop_image(input,fov)
-        ct = utils.crop_image(ct,fov)
-        mask = utils.crop_image(mask,fov)
-        fov = utils.crop_image(fov,fov)
+        input = utils.crop_image(input,fov_s1)
+        ct = utils.crop_image(ct,fov_s1)
+        mask = utils.crop_image(mask,fov_s1)
+        fov = utils.crop_image(fov_s1,fov_s1)
         
         #deform CT to match input
         ct_deformed, transform = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
+        
         #apply fov mask to deformed ct
         ct_deformed = utils.mask_image(ct_deformed,fov,-1000)
         
@@ -96,16 +99,16 @@ if __name__ == "__main__":
         logger.info('Preprocessing and warping structures...')
         structures = os.listdir(os.path.join(patient['output_dir'],'structures'))
         structures = [struct for struct in structures if struct.endswith('.nrrd') or struct.endswith('.nii')]
+        structures = [struct for struct in structures if not struct.endswith('_s2.nrrd') and not struct.endswith('_s2_def.nrrd')]
         spacing = ct.GetSpacing()
-        fov_s1 = utils.read_image(os.path.join(patient['output_dir'],'fov_s1.nii.gz'),log=logger)
         ct_s1 = utils.read_image(os.path.join(patient['output_dir'],'ct_s1.nii.gz'),log=logger)
         for struct in structures:
             struct_path = os.path.join(patient['output_dir'],'structures',struct)
-            struct_img = utils.read_image(struct_path)
+            struct_img = utils.read_image(struct_path,log=logger)
             struct_img = utils.resample_struct(struct_img,ct_s1)
             struct_img = utils.crop_image(struct_img,fov_s1)
             struct_img = utils.mask_image(struct_img,fov,0)
-            struct_deformed = utils.warp_structure(struct_img,transform,log=logger)
+            struct_deformed = utils.warp_structure(struct_img,transform)
             utils.save_image(struct_img,os.path.join(patient['output_dir'],'structures',struct.strip('.nrrd')+'_s2.nrrd'))
             utils.save_image(struct_deformed,os.path.join(patient['output_dir'],'structures',struct.strip('.nrrd')+'_s2_def.nrrd'))
         
@@ -122,5 +125,5 @@ if __name__ == "__main__":
         sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
         #Generate png overview
-        utils.generate_overview_png(ct,input,mask,patient['output_dir'])
+        utils.generate_overview_png(ct,input,mask,patient)
    

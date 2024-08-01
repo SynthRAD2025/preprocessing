@@ -631,6 +631,23 @@ def resample_struct(struct, ref_image,log=False)->sitk.Image:
         log.info(f'Struct resampled to reference image!')
     return resampled_struct
 
+def cone_correction(fov:sitk.Image,log=False):
+        fov_np = sitk.GetArrayFromImage(fov)
+        fov_shape = fov_np.shape
+        area = np.zeros(fov_shape[0])
+        for i in range(fov_shape[0]):
+            area[i] = np.sum(fov_np[i,:,:])
+        area = area / np.max(area)
+        area = [1 if i > 0.95 else 0 for i in area]
+        full = np.argwhere(area)
+        full_I = np.min(full)
+        full_S = np.max(full)
+        fov[:,:,:full_I] = 0
+        fov[:,:,full_S:] = 0
+        if log != False:
+            log.info(f'Cone correction applied to FOV with full_I = {full_I} and full_S = {full_S}') 
+        return fov
+
 def segment_outline(input:sitk.Image,threshold:float=0.30,log=False)->sitk.Image:
     """
     Segment the outline of a given input image.
@@ -684,7 +701,7 @@ def segment_outline(input:sitk.Image,threshold:float=0.30,log=False)->sitk.Image
     
     return mask_filled
 
-def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,IS_correction=None, defacing_correction = None, cone_correction=None,log=False)->sitk.Image:
+def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,IS_correction=None, defacing_correction = None,log=False)->sitk.Image:
     """
     Postprocesses the input mask by dilating it and multiplying it with the field of view (FOV) image.
 
@@ -709,12 +726,8 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
             defacing_correction_str = True
         else:
             defacing_correction_str = False
-        if cone_correction != None:
-            cone_correction_str = True
-        else:
-            cone_correction_str = False
             
-        log.info(f'Starting postprocessing of patient outline mask with IS_correction = {IS_correction_str}, defacing_correction = {defacing_correction_str}, cone_correction = {cone_correction_str}')
+        log.info(f'Starting postprocessing of patient outline mask with IS_correction = {IS_correction_str}, defacing_correction = {defacing_correction_str}')
     
     # dilate mask 
     dilate = sitk.BinaryDilateImageFilter()
@@ -740,9 +753,6 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
         mask_final_np[defacing_np==1]=0
         mask_final = sitk.GetImageFromArray(mask_final_np)
         mask_final.CopyInformation(mask)
-        
-    # if cone_correction != None:
-    #     cone = 
     
     return mask_final
 
@@ -822,7 +832,7 @@ def warp_structure(structure:sitk.Image,transform):
     return transformed_mask
 
 
-def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,output_dir:str)->None:
+def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient_dict:dict)->None:
     """
     Generate an overview PNG image showing slices from different orientations of the input CT, input image, and mask.
 
@@ -846,25 +856,44 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,output_
     slice_cor = shape[1]//2
     slice_ax = shape[0]//2
     fig,ax = plt.subplots(3,3,figsize=(15,15))
-    ax[0,0].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
-    ax[0,1].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
-    ax[0,1].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
-    ax[0,2].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
-    ax[0,2].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
-
-    ax[1,0].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
-    ax[1,1].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
-    ax[1,1].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
-    ax[1,2].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
-    ax[1,2].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
-
-    ax[2,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
-    ax[2,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
-    ax[2,1].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
-    ax[2,2].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
-    ax[2,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[0,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
+    ax[0,1].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
+    ax[0,2].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
     
-    plt.savefig(os.path.join(output_dir,'overview.png'),dpi=300,bbox_inches='tight')
+    ax[1,0].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,1].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[1,1].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
+    ax[1,2].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,2].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
+
+    ax[2,0].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,1].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[2,1].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
+    ax[2,2].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,2].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+
+    def add_text(ax,text):
+        props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
+        ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,fontweight='bold',verticalalignment='top', bbox=props)
+
+    for r,ax_row in enumerate(ax):
+        for c,a in enumerate(ax_row):
+            a.set_xticks([])
+            a.set_yticks([])
+            if c == 0:
+                add_text(a,'CT')
+                a.set_ylabel('Axial' if r == 0 else 'Sagittal' if r == 1 else 'Coronal',fontsize=12,fontweight='bold')
+            if c == 1:
+                add_text(a,'Input + Mask')
+            if c == 2:
+                add_text(a,'Overlay')
+    
+    plt.subplots_adjust(wspace=0, hspace=0)
+    
+    fig.text(0.5, 0.90, patient_dict['ID'], fontsize=16,fontweight='bold',va='top', ha='center')
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'[{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
     
 def generate_overview_stage1(ct:sitk.Image,input:sitk.Image,output_dir:str)->None:
     """
