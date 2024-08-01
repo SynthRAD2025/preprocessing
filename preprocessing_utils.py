@@ -68,7 +68,7 @@ def convert_rtstruct_to_nrrd(rtstruct_path:str, output_dir:str,plastimatch_path=
 
     Parameters:
     rtstruct_path (str): The path to the RTSTRUCT file.
-    nrrd_dir_path (str): The directory path where the NRRD files will be saved.
+    output_dir (str): The directory path where the NRRD files will be saved.
     plastimatch_path (str, optional): The path to the plastimatch executable. Defaults to None.
 
     Returns:
@@ -603,6 +603,34 @@ def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False)->sitk.Image:
         log.info(f'Image resampled to new spacing {new_spacing}')
     return resampled_image
 
+def resample_struct(struct, ref_image,log=False)->sitk.Image:
+    """
+    Resamples the given image to the grid of a reference image.
+
+    Parameters:
+    - struct: SimpleITK.Image
+        The input struct to be resampled.
+    - ref_image: SimpleITK.Image
+        reference image for resampling.
+
+    Returns:
+    - resampled_struct: SimpleITK.Image
+        The resampled struct.
+
+    """
+
+    # Create a resample filter
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetReferenceImage(ref_image)
+    resampler.SetTransform(sitk.Transform())
+    resampler.SetDefaultPixelValue(struct.GetPixelIDValue())
+
+    # Apply the resampling
+    resampled_struct = resampler.Execute(struct)
+    if log != False:
+        log.info(f'Struct resampled to reference image!')
+    return resampled_struct
+
 def segment_outline(input:sitk.Image,threshold:float=0.30,log=False)->sitk.Image:
     """
     Segment the outline of a given input image.
@@ -687,6 +715,7 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
             cone_correction_str = False
             
         log.info(f'Starting postprocessing of patient outline mask with IS_correction = {IS_correction_str}, defacing_correction = {defacing_correction_str}, cone_correction = {cone_correction_str}')
+    
     # dilate mask 
     dilate = sitk.BinaryDilateImageFilter()
     dilate.SetKernelType(sitk.sitkBall)
@@ -712,6 +741,9 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
         mask_final = sitk.GetImageFromArray(mask_final_np)
         mask_final.CopyInformation(mask)
         
+    # if cone_correction != None:
+    #     cone = 
+    
     return mask_final
 
 def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
@@ -769,17 +801,14 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     
     return image_cropped
 
-def warp_structure(structure:sitk.Image,transform:str,log=None):
-    if log != None:
-        log.info(f'Warping structure using transform {transform}...')
+def warp_structure(structure:sitk.Image,transform):
     # read transform and change interpolator to nearest neighbor
-    transform = sitk.ReadParameterFile(transform)
     transform['FinalBSplineInterpolationOrder']='0'  
 
     # create bspline transformix filter
     transformer = sitk.TransformixImageFilter()
     transformer.SetTransformParameterMap(transform)
-    transformer.LogToConsoleOn()
+    transformer.LogToConsoleOff()
     transformer.LogToFileOff()
     transformer.SetMovingImage(structure)
     transformer.Execute()
@@ -787,8 +816,8 @@ def warp_structure(structure:sitk.Image,transform:str,log=None):
     
     ## post-process mask to slightly smooth the edges
     transformed_mask = sitk.Threshold(sitk.Cast(transformed_mask, sitk.sitkUInt16),0,1)
-    transformed_mask = sitk.BinaryDilate(transformed_mask, (4,4,4), sitk.sitkBall)
-    transformed_mask = sitk.BinaryErode(transformed_mask, (4,4,4),sitk.sitkBall)
+    transformed_mask = sitk.BinaryDilate(transformed_mask, (2,2,2), sitk.sitkBall)
+    transformed_mask = sitk.BinaryErode(transformed_mask, (2,2,2),sitk.sitkBall)
     
     return transformed_mask
 
