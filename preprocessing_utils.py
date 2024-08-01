@@ -669,7 +669,7 @@ def cone_correction(fov:sitk.Image,log=None):
     full_I = np.min(full)
     full_S = np.max(full)
     fov[:,:,:full_I] = 0
-    fov[:,:,full_S:] = 0
+    fov[:,:,full_S+1:] = 0
     if log != None:
         log.info(f'Cone correction applied to FOV with full_I = {full_I} and full_S = {full_S}') 
     return fov
@@ -931,7 +931,7 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
     plt.subplots_adjust(wspace=0, hspace=0)
     
     fig.text(0.5, 0.90, patient_dict['ID'], fontsize=16,fontweight='bold',va='top', ha='center')
-    plt.savefig(os.path.join(patient_dict['output_dir'],f'[{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
     
 def generate_overview_stage1(ct:sitk.Image,input:sitk.Image,output_dir:str)->None:
     """
@@ -1008,7 +1008,7 @@ def csv_to_dict(file):
     patients_dict = {}
     for line in lines[1:]:
         patients_dict[line[0]] = {}
-        for i in range(1, len(line)):
+        for i in range(0, len(line)):
             patients_dict[line[0]][lines[0][i]] = line[i]
         try:
             patients_dict[line[0]]['task'] = int(patients_dict[line[0]]['task'])

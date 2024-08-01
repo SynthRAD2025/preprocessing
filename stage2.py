@@ -29,6 +29,7 @@ if __name__ == "__main__":
         sys.exit(1)
     for i in patient_dict:
         patient = patient_dict[i]
+        print(patient['ID'])
         # check if output files already exist and skip if flag is set
         if skip_existing:
             if patient['task'] == 1:
@@ -63,8 +64,9 @@ if __name__ == "__main__":
         if patient['defacing_correction'] == True:
             face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
         
-        #Perform cone correction for fov mask
-        fov_s1 = utils.cone_correction(fov_s1,log=logger)
+        #Perform cone correction for fov mask if task2
+        if patient['task'] == 2:
+            fov_s1 = utils.cone_correction(fov_s1,log=logger)
         
         #Generate patient outline and postprocess it
         mask = utils.segment_outline(input,patient['mask_thresh'],log=logger)
@@ -92,8 +94,20 @@ if __name__ == "__main__":
         #deform CT to match input
         ct_deformed, transform = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
         
-        #apply fov mask to deformed ct
+        #deform defacing mask if necessary and apply to fov
+        if patient['defacing_correction']:
+            face_deformed = utils.warp_structure(face,transform)       
+            fov = utils.mask_image(fov,face_deformed,0)
+             
+        #apply fov mask to all images
+        if patient['task'] == 1:
+            mask_value = 0
+        if patient['task'] == 2:
+            mask_value = -1000
         ct_deformed = utils.mask_image(ct_deformed,fov,-1000)
+        ct = utils.mask_image(ct,fov,-1000)
+        input = utils.mask_image(input,fov,mask_value)
+        mask = utils.mask_image(mask,fov,0)
         
         #preprocess structures
         logger.info('Preprocessing and warping structures...')
@@ -109,9 +123,9 @@ if __name__ == "__main__":
             struct_img = utils.crop_image(struct_img,fov_s1)
             struct_img = utils.mask_image(struct_img,fov,0)
             struct_deformed = utils.warp_structure(struct_img,transform)
+            struct_deformed = utils.mask_image(struct_deformed,fov,0)
             utils.save_image(struct_img,os.path.join(patient['output_dir'],'structures',struct.strip('.nrrd')+'_s2.nrrd'))
             utils.save_image(struct_deformed,os.path.join(patient['output_dir'],'structures',struct.strip('.nrrd')+'_s2_def.nrrd'))
-        
         
         #Save cropped images and transform
         if patient['task'] == 1:
