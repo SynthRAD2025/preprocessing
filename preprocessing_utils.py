@@ -151,6 +151,22 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     return registered_image,inverse_transform
 
 def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value=0, log=False)->Union[sitk.Image,sitk.Transform]:
+    """
+    Perform deformable registration between a fixed image and a moving image using the specified parameter file.
+
+    Args:
+        fixed (sitk.Image): The fixed image to register to.
+        moving (sitk.Image): The moving image to be registered.
+        parameter_file (str): The path to the parameter file containing the registration parameters.
+        mask (sitk.Image, optional): The mask image to restrict the registration. Defaults to None.
+        default_value (int, optional): The default value to use for pixels outside the moving image. Defaults to 0.
+        log (bool, optional): Whether to log the registration process. Defaults to False.
+
+    Returns:
+        Union[sitk.Image, sitk.Transform]: The registered moving image and the transform parameter map.
+
+    """
+    
     if log != False:
         log.info(f'Starting deformable registration using parameter file {parameter_file}')
         
@@ -179,9 +195,9 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,
     shutil.rmtree(temp_dir)
     
     if log != False:
-        log.info(f'Deformable registration succesfull!')
+        log.info(f'Deformable registration successful!')
     
-    return moving_def,transform
+    return moving_def, transform
 
 def correct_image_properties(input_image:sitk.Image, order=[0,1,2], flip=[False,False,False], intensity_shift=None, data_type=None, mr_overlap_correction=False, log=False):
     """
@@ -631,22 +647,32 @@ def resample_struct(struct, ref_image,log=False)->sitk.Image:
         log.info(f'Struct resampled to reference image!')
     return resampled_struct
 
-def cone_correction(fov:sitk.Image,log=False):
-        fov_np = sitk.GetArrayFromImage(fov)
-        fov_shape = fov_np.shape
-        area = np.zeros(fov_shape[0])
-        for i in range(fov_shape[0]):
-            area[i] = np.sum(fov_np[i,:,:])
-        area = area / np.max(area)
-        area = [1 if i > 0.95 else 0 for i in area]
-        full = np.argwhere(area)
-        full_I = np.min(full)
-        full_S = np.max(full)
-        fov[:,:,:full_I] = 0
-        fov[:,:,full_S:] = 0
-        if log != False:
-            log.info(f'Cone correction applied to FOV with full_I = {full_I} and full_S = {full_S}') 
-        return fov
+def cone_correction(fov:sitk.Image,log=None):
+    """
+    Apply cone correction to the given field of view (FOV) image. Only used for Task2.
+    
+    Parameters:
+    - fov (sitk.Image): The input field of view image.
+    - log (bool, optional): Whether to log cone correction information. Defaults to None.
+
+    Returns:
+    - sitk.Image: The cone-corrected field of view image.
+    """
+    fov_np = sitk.GetArrayFromImage(fov)
+    fov_shape = fov_np.shape
+    area = np.zeros(fov_shape[0])
+    for i in range(fov_shape[0]):
+        area[i] = np.sum(fov_np[i,:,:])
+    area = area / np.max(area)
+    area = [1 if i > 0.95 else 0 for i in area]
+    full = np.argwhere(area)
+    full_I = np.min(full)
+    full_S = np.max(full)
+    fov[:,:,:full_I] = 0
+    fov[:,:,full_S:] = 0
+    if log != None:
+        log.info(f'Cone correction applied to FOV with full_I = {full_I} and full_S = {full_S}') 
+    return fov
 
 def segment_outline(input:sitk.Image,threshold:float=0.30,log=False)->sitk.Image:
     """
@@ -812,6 +838,18 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     return image_cropped
 
 def warp_structure(structure:sitk.Image,transform):
+    """
+    Warps the structures with the transform generater by the deformable image registration.
+    Also performs minor smoothing of the outline to reduce artifacts from b-spline registration
+
+    Args:
+        structure (sitk.Image): The input structure image to be transformed.
+        transform: The transform parameter map to be applied.
+
+    Returns:
+        sitk.Image: The transformed structure image.
+    """
+    
     # read transform and change interpolator to nearest neighbor
     transform['FinalBSplineInterpolationOrder']='0'  
 
