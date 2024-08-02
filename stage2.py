@@ -141,7 +141,7 @@ if __name__ == "__main__":
         utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
         utils.save_image(fov,os.path.join(patient['output_dir'],'fov_s2.nii.gz'))
         utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_s2_def.nii.gz'))
-        sitk.save_image(ct_deformed_stitched, os.path.join(patient['output_dir'],'ct_s2_def_stitched.nii.gz'))
+        utils.save_image(ct_deformed_stitched, os.path.join(patient['output_dir'],'ct_s2_def_stitched.nii.gz'))
         sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
         #Generate png overviews
