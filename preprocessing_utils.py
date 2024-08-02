@@ -2,11 +2,13 @@ import tempfile
 import shutil
 import os
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import csv
 import subprocess
 import SimpleITK as sitk
 import numpy as np
 import nibabel as nib
+import math
 from typing import Union
 from totalsegmentator.python_api import totalsegmentator
 from scipy import ndimage
@@ -962,7 +964,134 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
     fig.subplots_adjust(wspace=0.02,hspace=0.02)
     plt.tight_layout()
     plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
+
+def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.Image, mask:sitk.Image,patient_dict:dict)->None:
+    """
+    Generate an overview PNG image showing slices from different orientations of the input CT, input image, and mask.
+
+    Parameters:
+    ct (sitk.Image): The CT image.
+    input (sitk.Image): The input image.
+    mask (sitk.Image): The mask image.
+    output_dir (str): The directory to save the overview PNG image.
+
+    Returns:
+    None
+    """
     
+    shape = np.shape(sitk.GetArrayFromImage(ct))
+    background_ct = np.percentile(sitk.GetArrayFromImage(ct), 0.1)
+    high_ct = np.percentile(sitk.GetArrayFromImage(ct), 99.9)
+    background_input = np.percentile(sitk.GetArrayFromImage(input), 0.1)
+    high_input = np.percentile(sitk.GetArrayFromImage(input), 99.9)
+
+    slice_sag = shape[2]//2
+    slice_cor = shape[1]//2
+    slice_ax = shape[0]//2
+    
+    #calculate final size of figure so minimal white space in figure
+    size=[]
+    size.append((slice_sag*2,slice_cor*2))
+    size.append((slice_sag*2,slice_ax*2))
+    size.append((slice_cor*2,slice_ax*2))
+    
+    aspec = [i[1]/i[0] for i in size]
+    aspec[1] = aspec[1]*3
+    aspec[2] = aspec[2]*3
+    
+    aspec[0]=aspec[0]/aspec[2]
+    aspec[1]=aspec[2]/aspec[1]
+    aspec[2]=aspec[2]/aspec[2]
+    
+    x_len = aspec[0]*5
+    y_len = aspec[0]+aspec[1]+aspec[2]
+ 
+    x_len_norm = x_len/x_len
+    y_len_norm = y_len/x_len
+    
+    gridspec_kw={'width_ratios':[1,1,1,1,1],'height_ratios':[aspec[0],aspec[1],aspec[2]]}
+    size=20
+    
+    fig,ax = plt.subplots(3,5,figsize=(x_len_norm*size,y_len_norm*size),gridspec_kw=gridspec_kw)
+    
+    ax[0,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
+    ax[0,1].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
+    ax[0,2].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[0,3].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,4].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,4].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    ax[1,0].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,1].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[1,1].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
+    ax[1,2].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,2].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
+    ax[1,3].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,4].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    ax[2,0].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,1].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[2,1].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
+    ax[2,2].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,2].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[2,3].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,4].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    structures = os.listdir(os.path.join(patient_dict['output_dir'],'structures'))
+    structures = [i for i in structures if i.endswith('s2_def.nrrd')]
+    colormap = plt.get_cmap('tab20')
+    num_colors = 20
+    colors = [mcolors.rgb2hex(colormap((i / num_colors))) for i in range(num_colors)]
+    lines = [0 for i in range(len(structures))]
+    for i, struct in enumerate(structures):
+        struct = sitk.ReadImage(os.path.join(patient_dict['output_dir'],'structures',struct))
+        struct = sitk.GetArrayFromImage(struct)
+        ax[0,3].contour(struct[slice_ax,:,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+        ax[1,3].contour(struct[::-1,:,slice_sag],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+        ax[2,3].contour(struct[::-1,slice_cor,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+        lines[i]=ax[2,3].plot(0,0,color=colors[i%len(colors)],label='_'.join(structures[i].split('_')[0:-2])[:20])
+    rows=math.ceil(len(structures)/8)
+    fig.legend(loc='lower center',bbox_to_anchor=(0.5, -0.026*rows),ncol=8,fontsize=10)
+
+    
+
+    def add_text(ax,text):
+        props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
+        ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top', bbox=props)
+    
+    def add_patient(ax,text):
+        props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
+        ax.text(0.95, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top',horizontalalignment='right',bbox=props)
+
+    for r,ax_row in enumerate(ax):
+        for c,a in enumerate(ax_row):
+            a.set_xticks([])
+            a.set_yticks([])
+            if c == 0:
+                add_text(a,'CT')
+                add_patient(a,patient_dict['ID'])
+                a.set_ylabel('Axial' if r == 0 else 'Sagittal' if r == 1 else 'Coronal',fontsize=12,fontweight='bold')
+            if c == 1:
+                add_text(a,'Input + Mask')
+                add_patient(a,patient_dict['ID'])
+            if c == 2:
+                add_text(a,'Overlay')
+                add_patient(a,patient_dict['ID'])
+            if c == 3:
+                add_text(a,'CT def')
+                add_patient(a,patient_dict['ID'])
+            if c == 4:
+                add_text(a,'Overlay def')
+                add_patient(a,patient_dict['ID'])
+    
+    fig.subplots_adjust(wspace=0.02,hspace=0.02)
+    plt.tight_layout()
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}_planning.png'),dpi=300,bbox_inches='tight')
+
 def generate_overview_stage1(ct:sitk.Image,input:sitk.Image,output_dir:str)->None:
     """
     Generate an overview PNG image showing slices from different orientations of the input CT and input image after stage 1 preprocessing.

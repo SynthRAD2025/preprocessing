@@ -124,8 +124,8 @@ if __name__ == "__main__":
             struct_img = utils.mask_image(struct_img,fov,0)
             struct_deformed = utils.warp_structure(struct_img,transform)
             struct_deformed = utils.mask_image(struct_deformed,fov,0)
-            utils.save_image(struct_img,os.path.join(patient['output_dir'],'structures',struct.strip('.nrrd')+'_s2.nrrd'))
-            utils.save_image(struct_deformed,os.path.join(patient['output_dir'],'structures',struct.strip('.nrrd')+'_s2_def.nrrd'))
+            utils.save_image(struct_img,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_s2.nrrd'))
+            utils.save_image(struct_deformed,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_s2_def.nrrd'))
         
         #Save cropped images and transform
         if patient['task'] == 1:
@@ -138,6 +138,7 @@ if __name__ == "__main__":
         utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_s2_def.nii.gz'))
         sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
-        #Generate png overview
+        #Generate png overviews
         utils.generate_overview_png(ct,input,mask,patient)
+        utils.generate_overview_planning(ct,input,ct_deformed,mask,patient)
    
