@@ -119,14 +119,19 @@ if __name__ == "__main__":
         for struct in structures:
             struct_path = os.path.join(patient['output_dir'],'structures',struct)
             struct_img = utils.read_image(struct_path,log=logger)
-            struct_img = utils.resample_struct(struct_img,ct_s1)
+            struct_img = utils.resample_reference(struct_img,ct_s1)
             struct_img = utils.crop_image(struct_img,fov_s1)
             struct_img = utils.mask_image(struct_img,fov,0)
             struct_deformed = utils.warp_structure(struct_img,transform)
             struct_deformed = utils.mask_image(struct_deformed,fov,0)
+            struct_stitched = utils.stitch_image(struct_deformed, struct_img, mask)
+            utils.save_image(struct_stitched,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_stitched.nrrd'))
             utils.save_image(struct_img,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_s2.nrrd'))
             utils.save_image(struct_deformed,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_s2_def.nrrd'))
         
+        # Stitch CT_def to CT_s1 for planning (structures are stitched above)
+        ct_deformed_stitched = utils.stitch_image(ct_deformed, ct_s1, mask)
+       
         #Save cropped images and transform
         if patient['task'] == 1:
             utils.save_image(input,os.path.join(patient['output_dir'],'mr_s2.nii.gz'))
@@ -136,6 +141,7 @@ if __name__ == "__main__":
         utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
         utils.save_image(fov,os.path.join(patient['output_dir'],'fov_s2.nii.gz'))
         utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_s2_def.nii.gz'))
+        sitk.save_image(ct_deformed_stitched, os.path.join(patient['output_dir'],'ct_s2_def_stitched.nii.gz'))
         sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
         #Generate png overviews

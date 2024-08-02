@@ -560,9 +560,36 @@ def mask_image(image:sitk.Image, mask:sitk.Image, mask_value = -1000)->sitk.Imag
     masked_image = sitk.Mask(image, mask, outsideValue=mask_value)
     return masked_image
 
+def resample_reference(image, ref_image, default_value=0, log=None)->sitk.Image:
+    """
+    Resamples the given image to the grid of a reference image.
+
+    Parameters:
+    - image: SimpleITK.Image
+        The input struct to be resampled.
+    - ref_image: SimpleITK.Image
+        reference image for resampling.
+
+    Returns:
+    - resampled_image: SimpleITK.Image
+        The resampled struct.
+
+    """
+    # Create a resample filter
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetReferenceImage(ref_image)
+    resampler.SetDefaultPixelValue(default_value)
+    # Apply the resampling
+    resampled_image = resampler.Execute(image)
+    
+    if log != None:
+        log.info(f'Struct resampled to reference image!')
+    return resampled_image
+
 def stitch_image(image_inside: sitk.Image, image_outside: sitk.Image, mask: sitk.Image) -> sitk.Image:
     """
     Stitches the `image_inside` and `image_outside` based on the `mask`.
+    Also resamples the inside image and mask to be on same grid as outside image.
 
     Args:
         image_inside (sitk.Image): The image to be stitched inside the mask.
@@ -573,6 +600,9 @@ def stitch_image(image_inside: sitk.Image, image_outside: sitk.Image, mask: sitk
         sitk.Image: The stitched image.
 
     """
+    image_inside = resample_reference(image_inside,image_outside,default_value=0)
+    mask = resample_reference(mask,image_outside,default_value=0)
+    
     image_inside_np = sitk.GetArrayFromImage(image_inside)
     mask_np = sitk.GetArrayFromImage(mask)
     image_outside_np = sitk.GetArrayFromImage(image_outside)
@@ -621,33 +651,7 @@ def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False)->sitk.Image:
         log.info(f'Image resampled to new spacing {new_spacing}')
     return resampled_image
 
-def resample_struct(struct, ref_image,log=False)->sitk.Image:
-    """
-    Resamples the given image to the grid of a reference image.
 
-    Parameters:
-    - struct: SimpleITK.Image
-        The input struct to be resampled.
-    - ref_image: SimpleITK.Image
-        reference image for resampling.
-
-    Returns:
-    - resampled_struct: SimpleITK.Image
-        The resampled struct.
-
-    """
-
-    # Create a resample filter
-    resampler = sitk.ResampleImageFilter()
-    resampler.SetReferenceImage(ref_image)
-    resampler.SetTransform(sitk.Transform())
-    resampler.SetDefaultPixelValue(struct.GetPixelIDValue())
-
-    # Apply the resampling
-    resampled_struct = resampler.Execute(struct)
-    if log != False:
-        log.info(f'Struct resampled to reference image!')
-    return resampled_struct
 
 def cone_correction(fov:sitk.Image,log=None):
     """
@@ -1014,30 +1018,30 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
     
     fig,ax = plt.subplots(3,5,figsize=(x_len_norm*size,y_len_norm*size),gridspec_kw=gridspec_kw)
     
-    ax[0,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
-    ax[0,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
-    ax[0,1].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
-    ax[0,2].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
-    ax[0,2].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
-    ax[0,3].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,1].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,0].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
+    ax[0,0].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
+    ax[0,3].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,3].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[0,2].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
     ax[0,4].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
     ax[0,4].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
     
-    ax[1,0].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
-    ax[1,1].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
-    ax[1,1].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
-    ax[1,2].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
-    ax[1,2].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
-    ax[1,3].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,1].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,0].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[1,0].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
+    ax[1,3].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,3].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
+    ax[1,2].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
     ax[1,4].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
     ax[1,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
     
-    ax[2,0].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
-    ax[2,1].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
-    ax[2,1].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
-    ax[2,2].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
-    ax[2,2].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
-    ax[2,3].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,1].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,0].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[2,0].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
+    ax[2,3].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,3].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[2,2].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
     ax[2,4].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
     ax[2,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
     
@@ -1050,10 +1054,10 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
     for i, struct in enumerate(structures):
         struct = sitk.ReadImage(os.path.join(patient_dict['output_dir'],'structures',struct))
         struct = sitk.GetArrayFromImage(struct)
-        ax[0,3].contour(struct[slice_ax,:,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
-        ax[1,3].contour(struct[::-1,:,slice_sag],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
-        ax[2,3].contour(struct[::-1,slice_cor,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
-        lines[i]=ax[2,3].plot(0,0,color=colors[i%len(colors)],label='_'.join(structures[i].split('_')[0:-2])[:20])
+        ax[0,2].contour(struct[slice_ax,:,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+        ax[1,2].contour(struct[::-1,:,slice_sag],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+        ax[2,2].contour(struct[::-1,slice_cor,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+        lines[i]=ax[2,2].plot(0,0,color=colors[i%len(colors)],label='_'.join(structures[i].split('_')[0:-2])[:20])
     rows=math.ceil(len(structures)/8)
     fig.legend(loc='lower center',bbox_to_anchor=(0.5, -0.026*rows),ncol=8,fontsize=10)
 
@@ -1072,17 +1076,17 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
             a.set_xticks([])
             a.set_yticks([])
             if c == 0:
-                add_text(a,'CT')
+                add_text(a,'Input + Mask')
                 add_patient(a,patient_dict['ID'])
                 a.set_ylabel('Axial' if r == 0 else 'Sagittal' if r == 1 else 'Coronal',fontsize=12,fontweight='bold')
             if c == 1:
-                add_text(a,'Input + Mask')
+                add_text(a,'CT')
                 add_patient(a,patient_dict['ID'])
             if c == 2:
-                add_text(a,'Overlay')
+                add_text(a,'CT def')
                 add_patient(a,patient_dict['ID'])
             if c == 3:
-                add_text(a,'CT def')
+                add_text(a,'Overlay')
                 add_patient(a,patient_dict['ID'])
             if c == 4:
                 add_text(a,'Overlay def')
