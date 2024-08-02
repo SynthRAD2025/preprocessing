@@ -35,14 +35,14 @@ if __name__ == "__main__":
             if patient['task'] == 1:
                 if (os.path.isfile(os.path.join(patient['output_dir'],'mr_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
-                    os.path.isfile(os.path.join(patient['output_dir'],'ct_deformed_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_s2_def.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
                     logger.info(f'Patient {i} already pre-processed. Skipping...')
                     continue
             elif patient['task'] == 2:
                 if (os.path.isfile(os.path.join(patient['output_dir'],'cbct_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
-                    os.path.isfile(os.path.join(patient['output_dir'],'ct_deformed_s2.nii.gz')) and 
+                    os.path.isfile(os.path.join(patient['output_dir'],'ct_s2_def.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
                     logger.info(f'Patient {i} already pre-processed. Skipping...')
                     continue
@@ -94,10 +94,10 @@ if __name__ == "__main__":
         #deform CT to match input
         ct_deformed, transform = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
         
-        #deform defacing mask if necessary and apply to fov
-        if patient['defacing_correction']:
-            face_deformed = utils.warp_structure(face,transform)       
-            fov = utils.mask_image(fov,face_deformed,0)
+        # #deform defacing mask if necessary and apply to fov
+        # if patient['defacing_correction']:
+        #     face_deformed = utils.warp_structure(face,transform)       
+        #     fov[face_deformed == 1] = 0
              
         #apply fov mask to all images
         if patient['task'] == 1:

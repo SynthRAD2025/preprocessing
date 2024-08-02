@@ -893,7 +893,31 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
     slice_sag = shape[2]//2
     slice_cor = shape[1]//2
     slice_ax = shape[0]//2
-    fig,ax = plt.subplots(3,3,figsize=(15,15))
+    
+    #calculate final size of figure so minimal white space in figure
+    size=[]
+    size.append((slice_sag*2,slice_cor*2))
+    size.append((slice_sag*2,slice_ax*2))
+    size.append((slice_cor*2,slice_ax*2))
+    
+    aspec = [i[1]/i[0] for i in size]
+    aspec[1] = aspec[1]*3
+    aspec[2] = aspec[2]*3
+    
+    aspec[0]=aspec[0]/aspec[2]
+    aspec[1]=aspec[2]/aspec[1]
+    aspec[2]=aspec[2]/aspec[2]
+    
+    x_len = aspec[0]*3
+    y_len = aspec[0]+aspec[1]+aspec[2]
+ 
+    x_len_norm = x_len/x_len
+    y_len_norm = y_len/x_len
+    
+    gridspec_kw={'width_ratios':[1,1,1],'height_ratios':[aspec[0],aspec[1],aspec[2]]}
+    size=13
+    fig,ax = plt.subplots(3,3,figsize=(x_len_norm*size,y_len_norm*size),gridspec_kw=gridspec_kw)
+    
     ax[0,0].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
     ax[0,1].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
     ax[0,1].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
@@ -914,7 +938,11 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
 
     def add_text(ax,text):
         props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
-        ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,fontweight='bold',verticalalignment='top', bbox=props)
+        ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top', bbox=props)
+    
+    def add_patient(ax,text):
+        props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
+        ax.text(0.95, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top',horizontalalignment='right',bbox=props)
 
     for r,ax_row in enumerate(ax):
         for c,a in enumerate(ax_row):
@@ -922,15 +950,17 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
             a.set_yticks([])
             if c == 0:
                 add_text(a,'CT')
+                add_patient(a,patient_dict['ID'])
                 a.set_ylabel('Axial' if r == 0 else 'Sagittal' if r == 1 else 'Coronal',fontsize=12,fontweight='bold')
             if c == 1:
                 add_text(a,'Input + Mask')
+                add_patient(a,patient_dict['ID'])
             if c == 2:
                 add_text(a,'Overlay')
+                add_patient(a,patient_dict['ID'])
     
-    plt.subplots_adjust(wspace=0, hspace=0)
-    
-    fig.text(0.5, 0.90, patient_dict['ID'], fontsize=16,fontweight='bold',va='top', ha='center')
+    fig.subplots_adjust(wspace=0.02,hspace=0.02)
+    plt.tight_layout()
     plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
     
 def generate_overview_stage1(ct:sitk.Image,input:sitk.Image,output_dir:str)->None:
