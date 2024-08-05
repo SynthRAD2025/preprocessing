@@ -5,7 +5,7 @@ import logging
 import sys
 
 # Set this to true if you want to skip already pre-processsed patients (checks if output files already exists)
-skip_existing = False
+skip_existing = True
 
 if __name__ == "__main__":
     ## set up logging to console and file
@@ -36,14 +36,16 @@ if __name__ == "__main__":
                 if (os.path.isfile(os.path.join(patient['output_dir'],'mr_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2_def.nii.gz')) and 
-                    os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
+                    os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz')) and
+                    os.path.isfile(os.path.join(patient['output_dir'],f'{patient["ID"]}.png'))):
                     logger.info(f'Patient {i} already pre-processed. Skipping...')
                     continue
             elif patient['task'] == 2:
                 if (os.path.isfile(os.path.join(patient['output_dir'],'cbct_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2.nii.gz')) and 
                     os.path.isfile(os.path.join(patient['output_dir'],'ct_s2_def.nii.gz')) and 
-                    os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz'))):
+                    os.path.isfile(os.path.join(patient['output_dir'],'mask_s2.nii.gz')) and
+                    os.path.isfile(os.path.join(patient['output_dir'],f'{patient["ID"]}.png'))):
                     logger.info(f'Patient {i} already pre-processed. Skipping...')
                     continue
         
@@ -54,7 +56,7 @@ if __name__ == "__main__":
         #Read Files
         if patient['task'] == 1:
             input = utils.read_image(os.path.join(patient['output_dir'],'mr_s1.nii.gz'),log=logger)
-        if patient['task'] == 2:
+        elif patient['task'] == 2:
             input = utils.read_image(os.path.join(patient['output_dir'],'cbct_s1.nii.gz'),log=logger)
         else:
             logger.error('Task not valid')
@@ -112,8 +114,14 @@ if __name__ == "__main__":
         #preprocess structures
         logger.info('Preprocessing and warping structures...')
         structures = os.listdir(os.path.join(patient['output_dir'],'structures'))
-        structures = [struct for struct in structures if struct.endswith('.nrrd') or struct.endswith('.nii')]
-        structures = [struct for struct in structures if not struct.endswith('_s2.nrrd') and not struct.endswith('_s2_def.nrrd')]
+        structures = [struct for struct in structures if 
+                      struct.endswith('.nrrd') or 
+                      struct.endswith('.nii') or 
+                      struct.endswith('.nii.gz')]
+        structures = [struct for struct in structures if not 
+                      struct.endswith('_s2.nrrd') and not 
+                      struct.endswith('_s2_def.nrrd') and not
+                      struct.endswith('_stitched.nrrd')]
         spacing = ct.GetSpacing()
         ct_s1 = utils.read_image(os.path.join(patient['output_dir'],'ct_s1.nii.gz'),log=logger)
         for struct in structures:

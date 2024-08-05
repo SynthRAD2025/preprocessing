@@ -995,28 +995,16 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
     
     #calculate final size of figure so minimal white space in figure
     size=[]
-    size.append((slice_sag*2,slice_cor*2))
-    size.append((slice_sag*2,slice_ax*2))
-    size.append((slice_cor*2,slice_ax*2))
+    sag_len = slice_sag*2
+    cor_len = slice_cor*2
+    ax_len = slice_ax*2
+    height_ratios = [cor_len/cor_len,((ax_len*3)/cor_len)*sag_len/cor_len,ax_len*3/cor_len]
+    x_len = (sag_len/cor_len)*5
+    y_len = np.array(height_ratios).sum()/x_len
+    gridspec_kw={'width_ratios':[1,1,1,1,1],'height_ratios':height_ratios}
     
-    aspec = [i[1]/i[0] for i in size]
-    aspec[1] = aspec[1]*3
-    aspec[2] = aspec[2]*3
-    
-    aspec[0]=aspec[0]/aspec[2]
-    aspec[1]=aspec[2]/aspec[1]
-    aspec[2]=aspec[2]/aspec[2]
-    
-    x_len = aspec[0]*5
-    y_len = aspec[0]+aspec[1]+aspec[2]
- 
-    x_len_norm = x_len/x_len
-    y_len_norm = y_len/x_len
-    
-    gridspec_kw={'width_ratios':[1,1,1,1,1],'height_ratios':[aspec[0],aspec[1],aspec[2]]}
     size=20
-    
-    fig,ax = plt.subplots(3,5,figsize=(x_len_norm*size,y_len_norm*size),gridspec_kw=gridspec_kw)
+    fig,ax = plt.subplots(3,5,figsize=(size,y_len*size),gridspec_kw=gridspec_kw)
     
     ax[0,1].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
     ax[0,0].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
@@ -1060,8 +1048,6 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
         lines[i]=ax[2,2].plot(0,0,color=colors[i%len(colors)],label='_'.join(structures[i].split('_')[0:-2])[:20])
     rows=math.ceil(len(structures)/8)
     fig.legend(loc='lower center',bbox_to_anchor=(0.5, -0.026*rows),ncol=8,fontsize=10)
-
-    
 
     def add_text(ax,text):
         props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
