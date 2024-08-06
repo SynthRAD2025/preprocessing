@@ -38,7 +38,7 @@
 
 // ******************* Optimizer ****************************
 
-(MaximumNumberOfIterations 1000 500 250)
+(MaximumNumberOfIterations 500 300 200)
 
 // **************** Image sampling **********************
 (Sampler "RandomSampler")

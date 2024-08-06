@@ -29,7 +29,6 @@ if __name__ == "__main__":
         sys.exit(1)
     for i in patient_dict:
         patient = patient_dict[i]
-        print(patient['ID'])
         # check if output files already exist and skip if flag is set
         if skip_existing:
             if patient['task'] == 1:
@@ -128,6 +127,8 @@ if __name__ == "__main__":
             struct_path = os.path.join(patient['output_dir'],'structures',struct)
             struct_img = utils.read_image(struct_path,log=logger)
             struct_img = utils.resample_reference(struct_img,ct_s1)
+            if patient['region'] == 'HN':
+                struct_img[face == 1] = 0
             struct_img = utils.crop_image(struct_img,fov_s1)
             struct_img = utils.mask_image(struct_img,fov,0)
             struct_deformed = utils.warp_structure(struct_img,transform)
