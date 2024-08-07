@@ -67,7 +67,8 @@ if __name__ == "__main__":
         
         #Perform cone correction for fov mask if task2
         if patient['task'] == 2:
-            fov_s1 = utils.cone_correction(fov_s1,log=logger)
+            if patient['cone_correction']:
+                fov_s1 = utils.cone_correction(fov_s1,log=logger)
         
         #Generate patient outline and postprocess it
         mask = utils.segment_outline(input,patient['mask_thresh'],log=logger)
