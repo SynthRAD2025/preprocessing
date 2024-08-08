@@ -65,6 +65,7 @@ stage1.py generates the following outputs for each patient:
 - **mr_s1.nii.gz**: defaced (if HN), resampled and registered MR image (only for task 1 cases)
 - **cbct_s1.nii.gz**: defaced (if HN), resampled and registered CBCT image (only for task 2 cases)
 - **fov_s1.nii.gz**: FOV mask of input image (CBCT/MR) in CT frame of reference
+- **defacing_mask.nii.gz**: mask of defaced region
 - **transform.tfm**: transformation file from input image to CT frame of reference
 - **overview.png**: overview image of the CT and input images (CBCT/MR)
 
@@ -79,14 +80,27 @@ In case the registration fails, the following steps can be taken:
 ## Stage 2
 
 ### Inputs
-stage2.py requires the following inputs:
+[stage2_config.csv](./stage2_config.csv) is a configuration file that contains all input parameters for the second stage. The configuration file contains a header in the first row and each further row contains configuration parameters for a single patient. The configuration file must contain the following columns:
 
 | column        | description           | parsed as|
-| ------------- |-------------| -------|
+| ------------- |-----------------------| ---------|
 | **ID**        | A unique patient ID in the synhtRAD2025 format: [Task][Region][Center][001-999].| str |
 | **task**      | *1* for Task 1 (MR-to-CT) and *2* for Task 2 (CBCT-to-CT)      |int|
 | **region**    |  *HN* for head and neck, *AB* for abdomen, *TH* for thorax  |  string |
+| **output_dir**   | directory containing outputs from stage1 and where all generated data from stage 1 will be stored | string |
+| **mask_thresh**| threshold for masking patient outline, value between 0 and 1, see stage2_config.csv for examples| float |
+|**defacing_correction**| *True* if defacing correction is required, *False* otherwis, ensures that all masks and images are defaced correctly| bool |
+|**cone_correction**| *True* if cone correction is required, *False* otherwise, ensures that all masks and images are corrected for cone beam artifacts at FOV edge, used only in Task2 | bool |
+|**IS_correction**| *True* if inferior-superuior FOV corrections are required, *False* otherwise, used mainly for 1B data | bool |
+|**parameter_def**| path to parameter file for deformable registration, example registration files are provided in [configs](./configs/)| string |
+
 ### Outputs
 stage2.py generates the following outputs for each patient:
-(work in progress)
+- **ct_s2.nii.gz**: resampled and cropped CT image
+- **mr_s2.nii.gz**: resampled, registered and cropped MR image (only for task 1 cases)
+- **cbct_s2.nii.gz**: resampled, registered and cropped CBCT image (only for task 2 cases)
+- **fov_s2.nii.gz**: FOV mask of input image (CBCT/MR) in CT frame of reference
+- **transform_def.txt**: transformation file from input image to CT frame of reference
+- **ID_s2.png**: overview image of the CT, input images (CBCT/MR), mask and and overlay
+- **ID_planning_s2.nrrd**: overview image showing also the deformed CT, planning structures and overlays for the deformed image
 
