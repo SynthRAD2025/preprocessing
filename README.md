@@ -93,6 +93,7 @@ In case the registration fails, the following steps can be taken:
 |**cone_correction**| *True* if cone correction is required, *False* otherwise, ensures that all masks and images are corrected for cone beam artifacts at FOV edge, used only in Task2 | bool |
 |**IS_correction**| *True* if inferior-superuior FOV corrections are required, *False* otherwise, used mainly for 1B data | bool |
 |**parameter_def**| path to parameter file for deformable registration, example registration files are provided in [configs](./configs/)| string |
+|**invert_structures**| if structures are delineated on the MR frame of reference instead of CT set to true| bool |
 
 ### Outputs
 stage2.py generates the following outputs for each patient:
