@@ -4,48 +4,39 @@
 (MovingImageDimension 3)
 (UseDirectionCosines "true")
 
-// ******************* Main Components ************************
+// **************** Main Components **************************
 
-(Registration "MultiMetricMultiResolutionRegistration")
+(Registration "MultiResolutionRegistration")
 (Interpolator "BSplineInterpolator")
 (ResampleInterpolator "FinalBSplineInterpolator")
 (Resampler "DefaultResampler")
 
-(FixedImagePyramid "FixedRecursiveImagePyramid")
-(MovingImagePyramid "MovingRecursiveImagePyramid")
+(FixedImagePyramid "FixedSmoothingImagePyramid")
+(MovingImagePyramid "MovingSmoothingImagePyramid")
 
 (Optimizer "AdaptiveStochasticGradientDescent")
 (Transform "BSplineTransform")
-(Metric "AdvancedMattesMutualInformation" "TransformBendingEnergyPenalty" "TransformRigidityPenalty")
-(Metric0Weight 1)
-(Metric1Weight 50) 
-(Metric2Weight 2)
+(Metric "DisplacementMagnitudePenalty")
 
-// ******************* Transformation **************************
-
-(GridSpacingSchedule 4 2 1)
-(FinalGridSpacingInPhysicalUnits 10)
+// ***************** Transformation **************************
 (HowToCombineTransforms "Compose")
+(FinalGridSpacingInPhysicalUnits 15)
 
 // ******************* Similarity measure *********************
-
-(NumberOfHistogramBins 100)
+(NumberOfHistogramBins 128) // OPTIMIZED BY QUANTITATIVE MEASURES
 
 // ******************** Multiresolution **********************
-
 (NumberOfResolutions 3)
-(ImagePyramidSchedule 4 4 4  2 2 2  1 1 1)
+(ImagePyramidSchedule 8 8 8  4 4 4  1 1 1)
 
 // ******************* Optimizer ****************************
-
-(MaximumNumberOfIterations 500 300 200)
+(MaximumNumberOfIterations 1000 1000 1000) // COULD PROBABLY BE LOWERED, ESPECIALLY FOR THE FIRST LEVELS OF THE IMAGE PYRAMID
 
 // **************** Image sampling **********************
 (Sampler "RandomSampler")
 (NumberOfSpatialSamples 4096)
 (NewSamplesEveryIteration "true")
-(ImageSampler "Grid")
-(SampleGridSpacing 4 2 1)
+(ImageSampler "Random")
 (SampleRegionSize 140) 
 (UseRandomSampleRegion "true")
 (MaximumNumberOfSamplingAttempts 5)
@@ -61,7 +52,5 @@
 //(WriteResultImageAfterEachResolution "true")
 //(WritePyramidImagesAfterEachResolution "true")
 
-(DefaultPixelValue -1000)
-(WriteResultImage "true")
-(ResultImagePixelType "short")
-(ResultImageFormat "nii.gz")
+(DefaultPixelValue 0)
+(WriteResultImage "false")

@@ -875,6 +875,85 @@ def warp_structure(structure:sitk.Image,transform):
     
     return transformed_mask
 
+def get_inverse_deformation(deformation, fixed_image):
+    
+    temp_dir = tempfile.mkdtemp()
+    current_directory = os.getcwd()
+    os.chdir(temp_dir)
+    
+    invert_params = sitk.ReadParameterFile('/workspace/code/preprocessing/configs/param_inverse_def.txt')
+    elastix = sitk.ElastixImageFilter()
+    elastix.SetParameterMap(invert_params)
+    elastix.SetInitialTransformParameterFileName(deformation)
+    elastix.SetFixedImage(fixed_image)
+    elastix.SetMovingImage(fixed_image)
+    elastix.LogToConsoleOff()
+    elastix.LogToFileOff()
+    elastix.SetNumberOfThreads(16)
+    elastix.Execute()
+    inverted_def = elastix.GetTransformParameterMap()[0]
+    inverted_def['InitialTransformParametersFileName'] = ['NoInitialTransform']
+    
+    os.chdir(current_directory)
+    shutil.rmtree(temp_dir)
+    
+    return inverted_def
+    
+def invert_structure(struct, rigid_reg, inverted_def_reg,ct):
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetReferenceImage(ct)
+    resampler.SetInterpolator(sitk.sitkLinear)
+    resampler.SetTransform(rigid_reg)
+    
+    struct_rigid = resampler.Execute(struct)
+    struct_inverted = warp_structure(struct_rigid,inverted_def_reg)
+    return struct_rigid, struct_inverted
+
+def preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform_def,mask,log=None):
+    output_dir = patient['output_dir']
+    region = patient['region']
+    invert = patient['invert_structures']
+    
+    #make list of all relevant structures
+    structures = os.listdir(os.path.join(output_dir,'structures'))
+    structures = [struct for struct in structures if 
+                    struct.endswith('.nrrd') or 
+                    struct.endswith('.nii') or 
+                    struct.endswith('.nii.gz')]
+    structures = [struct for struct in structures if not 
+                    struct.endswith('_s2.nrrd') and not 
+                    struct.endswith('_s2_def.nrrd') and not
+                    struct.endswith('_stitched.nrrd')]
+    if invert:
+        transform_def_inv = get_inverse_deformation(os.path.join(output_dir,'transform_def.txt'),input)
+    if patient['defacing_correction'] == True:
+            face = read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=log)
+    #pre-process each structure
+    for struct in structures:
+        struct_path = os.path.join(output_dir,'structures',struct)
+        struct_img = read_image(struct_path,log=log)
+        struct_img_orig = resample_reference(struct_img,ct_s1)
+        if invert:
+            struct_rigid, struct_inv = invert_structure(struct_img,rigid_reg,transform_def_inv,ct_s1)
+            struct_deformed = struct_rigid
+            struct_deformed = crop_image(struct_deformed,fov_s1)
+            struct_deformed = mask_image(struct_deformed,fov,0)
+            struct_img = struct_inv
+            #struct_deformed = mask_image(struct_deformed,fov,0)
+            #struct_img = mask_image(struct_img,fov,0)
+            struct_stitched = stitch_image(struct_deformed, struct_img_orig, mask)
+        else:
+            if region == 'HN':
+                struct_img_orig[face == 1] = 0
+            struct_img = crop_image(struct_img_orig,fov_s1)
+            struct_img = mask_image(struct_img,fov,0)
+            struct_deformed = warp_structure(struct_img,transform_def)
+            struct_deformed = mask_image(struct_deformed,fov,0)
+            struct_stitched = stitch_image(struct_deformed, struct_img_orig, mask)
+        save_image(struct_stitched,os.path.join(output_dir,'structures',struct.split('.')[0]+'_stitched.nrrd'))
+        save_image(struct_img,os.path.join(output_dir,'structures',struct.split('.')[0]+'_s2.nrrd'))
+        save_image(struct_deformed,os.path.join(output_dir,'structures',struct.split('.')[0]+'_s2_def.nrrd'))
+    
 
 def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient_dict:dict)->None:
     """
@@ -1200,5 +1279,10 @@ def csv_to_dict(file):
             patients_dict[line[0]]['cone_correction'] = True if patients_dict[line[0]]['cone_correction'] == 'True' or patients_dict[line[0]]['cone_correction'] == 'TRUE' else False
         except:
             pass
+        try:
+            patients_dict[line[0]]['invert_structures'] = True if patients_dict[line[0]]['invert_structures'] == 'True' or patients_dict[line[0]]['invert_structures'] == 'TRUE' else False
+        except:
+            pass
+
 
     return patients_dict

@@ -95,6 +95,7 @@ if __name__ == "__main__":
         
         #deform CT to match input
         ct_deformed, transform = utils.deformable_registration(input,ct,patient['parameter_def'],mask=mask,log=logger)
+        sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
         # #deform defacing mask if necessary and apply to fov
         # if patient['defacing_correction']:
@@ -113,31 +114,9 @@ if __name__ == "__main__":
         
         #preprocess structures
         logger.info('Preprocessing and warping structures...')
-        structures = os.listdir(os.path.join(patient['output_dir'],'structures'))
-        structures = [struct for struct in structures if 
-                      struct.endswith('.nrrd') or 
-                      struct.endswith('.nii') or 
-                      struct.endswith('.nii.gz')]
-        structures = [struct for struct in structures if not 
-                      struct.endswith('_s2.nrrd') and not 
-                      struct.endswith('_s2_def.nrrd') and not
-                      struct.endswith('_stitched.nrrd')]
-        spacing = ct.GetSpacing()
+        rigid_reg = sitk.ReadTransform(os.path.join(patient['output_dir'],'transform.tfm'))
         ct_s1 = utils.read_image(os.path.join(patient['output_dir'],'ct_s1.nii.gz'),log=logger)
-        for struct in structures:
-            struct_path = os.path.join(patient['output_dir'],'structures',struct)
-            struct_img = utils.read_image(struct_path,log=logger)
-            struct_img = utils.resample_reference(struct_img,ct_s1)
-            if patient['region'] == 'HN':
-                struct_img[face == 1] = 0
-            struct_img = utils.crop_image(struct_img,fov_s1)
-            struct_img = utils.mask_image(struct_img,fov,0)
-            struct_deformed = utils.warp_structure(struct_img,transform)
-            struct_deformed = utils.mask_image(struct_deformed,fov,0)
-            struct_stitched = utils.stitch_image(struct_deformed, struct_img, mask)
-            utils.save_image(struct_stitched,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_stitched.nrrd'))
-            utils.save_image(struct_img,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_s2.nrrd'))
-            utils.save_image(struct_deformed,os.path.join(patient['output_dir'],'structures',struct.split('.')[0]+'_s2_def.nrrd'))
+        utils.preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform,mask,log=logger)
         
         # Stitch CT_def to CT_s1 for planning (structures are stitched above)
         ct_deformed_stitched = utils.stitch_image(ct_deformed, ct_s1, mask)
@@ -152,7 +131,6 @@ if __name__ == "__main__":
         utils.save_image(fov,os.path.join(patient['output_dir'],'fov_s2.nii.gz'))
         utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_s2_def.nii.gz'))
         utils.save_image(ct_deformed_stitched, os.path.join(patient['output_dir'],'ct_s2_def_stitched.nii.gz'))
-        sitk.WriteParameterFile(transform, os.path.join(patient['output_dir'],'transform_def.txt'))
         
         #Generate png overviews
         utils.generate_overview_png(ct,input,mask,patient)
