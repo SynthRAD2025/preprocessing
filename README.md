@@ -16,7 +16,7 @@ This repository contains the code for pre-processing the data for the [synthRAD2
 
 The code is written/tested in Python 3.12.3 The following packages are required to run the code:
 
-- SimpleITK
+- SimpleITK-SimpleElastix
 - numpy
 - nibabel
 - scipy

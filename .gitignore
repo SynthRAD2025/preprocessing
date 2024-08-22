@@ -12,3 +12,6 @@ stage2_config_TH copy.csv
 stage2_config_TH_single.csv
 2ABA002_planning.png
 create_release.py
+.~lock.stage1_config_full.csv#
+.~lock.stage1_config.csv#
+stage1_config_full.csv
