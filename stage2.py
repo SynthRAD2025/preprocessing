@@ -123,14 +123,14 @@ if __name__ == "__main__":
        
         #Save cropped images and transform
         if patient['task'] == 1:
-            utils.save_image(input,os.path.join(patient['output_dir'],'mr_s2.nii.gz'))
+            utils.save_image(input,os.path.join(patient['output_dir'],'mr_s2.nii.gz'),dtype='int16')
         if patient['task'] == 2:
-            utils.save_image(input,os.path.join(patient['output_dir'],'cbct_s2.nii.gz'))
-        utils.save_image(ct,os.path.join(patient['output_dir'],'ct_s2.nii.gz'))
+            utils.save_image(input,os.path.join(patient['output_dir'],'cbct_s2.nii.gz'),dtype='int16')
+        utils.save_image(ct,os.path.join(patient['output_dir'],'ct_s2.nii.gz'),dtype='int16')
         utils.save_image(mask,os.path.join(patient['output_dir'],'mask_s2.nii.gz'))
         utils.save_image(fov,os.path.join(patient['output_dir'],'fov_s2.nii.gz'))
-        utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_s2_def.nii.gz'))
-        utils.save_image(ct_deformed_stitched, os.path.join(patient['output_dir'],'ct_s2_def_stitched.nii.gz'))
+        utils.save_image(ct_deformed,os.path.join(patient['output_dir'],'ct_s2_def.nii.gz'),dtype='int16')
+        utils.save_image(ct_deformed_stitched, os.path.join(patient['output_dir'],'ct_s2_def_stitched.nii.gz'),dtype='int16')
         
         #Generate png overviews
         utils.generate_overview_png(ct,input,mask,patient)

@@ -44,7 +44,7 @@
 (NumberOfSpatialSamples 4096)
 (NewSamplesEveryIteration "true")
 (ImageSampler "RandomCoordinate")
-(SampleRegionSize 140) 
+(SampleRegionSize 100) 
 (UseRandomSampleRegion "true")
 (MaximumNumberOfSamplingAttempts 5)
 (RequiredRatioOfValidSamples 0.05)

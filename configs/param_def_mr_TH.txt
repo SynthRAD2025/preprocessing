@@ -46,7 +46,7 @@
 (NewSamplesEveryIteration "true")
 (ImageSampler "Grid")
 (SampleGridSpacing 4 2 1)
-(SampleRegionSize 140) 
+(SampleRegionSize 100) 
 (UseRandomSampleRegion "true")
 (MaximumNumberOfSamplingAttempts 5)
 (RequiredRatioOfValidSamples 0.05)

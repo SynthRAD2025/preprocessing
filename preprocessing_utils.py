@@ -52,14 +52,23 @@ def read_dicom_image(image_path:str,log=False)->sitk.Image:
         log.info(f'DICOM image sucessfuly read from {image_path}')
     return image
 
-def save_image(image:sitk.Image, image_path:str,compression:bool=True,log=False):
+def save_image(image:sitk.Image, image_path:str, compression:bool=True, dtype:str=None, log=False):
     """
     Save the given SimpleITK image to the specified file path.
     
     Args:
         image (sitk.Image): The SimpleITK image to be saved.
         image_path (str): The file path where the image will be saved.
+        compression(bool): Whether to use compression when saving the image. Default is True.
+        dtype(sitk.PixelIDValueEnum): Default is None. Allowed dtypes: float32 and int16
     """
+    if dtype != None:
+        if dtype == 'float32':
+            image = sitk.Cast(image,sitk.sitkFloat32)
+        elif dtype == 'int16':
+            image = sitk.Cast(image,sitk.sitkInt16)
+        else:
+            raise ValueError('Invalid dtype/not implemented. Allowed dtypes: float32 and int16')
     sitk.WriteImage(image, image_path, useCompression=compression)
     if log != False:
         log.info(f'Image saved to {image_path}')
