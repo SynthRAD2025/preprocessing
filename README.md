@@ -1,5 +1,29 @@
-# synthRAD2025 pre-processing
-This repository contains the code for pre-processing the data for the [synthRAD2025 challenge](https://synthrad2025.grand-challenge.org/). The data preprocessing is performed in two stages:
+
+<!-- PROJECT LOGO -->
+<br />
+<p align="center">
+  <a href="https://synthrad2025.grand-challenge.org/">
+    <img src="./SynthRAD_banner.png" alt="Logo" width="770" height="160">
+  </a>
+
+
+  <p align="center">
+    Algorithm template docker for submissions to
+<a href="https://synthrad2025.grand-challenge.org/"><strong>SynthRAD2025 Grand Challenge</strong></a>
+  <br />
+    <a href="https://github.com/SynthRAD2025/preprocessing"><strong>Explore the docs »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/SynthRAD2025/preprocessing">View Demo</a>
+    ·
+    <a href="https://github.com/SynthRAD2025/preprocessing/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/SynthRAD2025/preprocessing/issues">Request Feature</a>
+  </p>
+</p>
+
+# SynthRAD2025 pre-processing
+This repository contains the code for pre-processing the data for the [SynthRAD2025 challenge](https://synthrad2025.grand-challenge.org/). The data preprocessing is performed in two stages:
 1. **Stage 1** contains all pre-processing steps carried out locally in each data providing center. This includes the following steps:
     - **Data conversion**: All image data is converted to .nii.gz and .nrrd format.
     - **Rigid registration**: CBCT and MR images are registered to the corresponding CT images.
