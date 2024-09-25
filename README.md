@@ -133,3 +133,47 @@ stage2.py generates the following outputs for each patient:
 - **ID_s2.png**: overview image of the CT, input images (CBCT/MR), mask and and overlay
 - **ID_planning_s2.nrrd**: overview image showing also the deformed CT, planning structures and overlays for the deformed image
 
+## Dicom tag extraction
+
+**read_tags(input_txt)**
+
+	description:
+	read dicom tag strings from a txt file
+
+	arguments:
+	input_txt: file path to text file containg dicom tags (see example in param_files)
+	
+	returns: 
+	python list containing dicom tags
+
+**extract_tags(dcm_folder_path,tag_list,pre_processed=None)**
+
+	description:
+	extracts tags from a folder containg dicom files (only from the first element) and from pre-processed nifti images
+
+	arguments:
+	dcm_folder_path: path to folder containing dicom image slices
+	tag_list: list defining which tags to extract
+	pre_processed: path to pre-processed nifti file (can be left out if tags should be only extracted from dicom files)
+
+	returns:
+	python dict with dicom tags as key:value pairs
+
+**write_dict_to_csv(input_dict,output_csv,tag_list)**
+
+	description:
+	takes a dict containing dicom tags and writes it to a csv file
+
+	arguments:
+	input_dict: dict containing extracted tags
+	output_csv: filename of output csv file
+	tag_list: list of dicom tags, necessary to create header in csv file
+
+**write_csv_to_xlsx(input_csv,output_xlsx)**
+
+	description:
+	takes a csv and creates an xlsx file
+
+	arguments:
+	input_csv: path to csv file
+	output_xlsx: filepath of output xlsx file
