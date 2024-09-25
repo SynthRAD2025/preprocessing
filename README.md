@@ -8,7 +8,7 @@
 
 
   <p align="center">
-    Algorithm template docker for submissions to
+    Data preprocessing step for the
 <a href="https://synthrad2025.grand-challenge.org/"><strong>SynthRAD2025 Grand Challenge</strong></a>
   <br />
     <a href="https://github.com/SynthRAD2025/preprocessing"><strong>Explore the docs »</strong></a>
