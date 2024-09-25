@@ -63,6 +63,9 @@ def save_image(image:sitk.Image, image_path:str, compression:bool=True, dtype:st
         dtype(sitk.PixelIDValueEnum): Default is None. Allowed dtypes: float32 and int16
     """
     if dtype != None:
+        if image.GetPixelIDTypeAsString() != '32-bit float':
+            image = sitk.Cast(image,sitk.sitkFloat32)
+        image = sitk.Round(image)
         if dtype == 'float32':
             image = sitk.Cast(image,sitk.sitkFloat32)
         elif dtype == 'int16':

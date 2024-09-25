@@ -1,7 +1,7 @@
 ID,task,region,output_dir,mask_thresh,defacing_correction,cone_correction,IS_correction,parameter_def,invert_structures
-1ABA001,1,AB,/workspace/data/1%/Task1/Abdomen/1ABA001/output,0.2,FALSE,FALSE,FALSE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,FALSE
-1ABA002,1,AB,/workspace/data/1%/Task1/Abdomen/1ABA002/output,0.2,FALSE,FALSE,FALSE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,FALSE
-1ABA006,1,AB,/workspace/data/1%/Task1/Abdomen/1ABA006/output,0.2,FALSE,FALSE,FALSE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,FALSE
+1ABA901,1,AB,/workspace/data/1%/Task1/Abdomen/1ABA901/output,0.2,FALSE,FALSE,FALSE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,FALSE
+1ABA902,1,AB,/workspace/data/1%/Task1/Abdomen/1ABA902/output,0.2,FALSE,FALSE,FALSE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,FALSE
+1ABA906,1,AB,/workspace/data/1%/Task1/Abdomen/1ABA906/output,0.2,FALSE,FALSE,FALSE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,FALSE
 1ABB001,1,AB,/workspace/data/1%/Task1/Abdomen/1ABB001/output,0.2,FALSE,FALSE,TRUE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,TRUE
 1ABB002,1,AB,/workspace/data/1%/Task1/Abdomen/1ABB002/output,0.2,FALSE,FALSE,TRUE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,TRUE
 1ABB003,1,AB,/workspace/data/1%/Task1/Abdomen/1ABB003/output,0.2,FALSE,FALSE,TRUE,/workspace/code/preprocessing/configs/param_def_mr_AB.txt,TRUE
