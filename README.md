@@ -135,6 +135,8 @@ stage2.py generates the following outputs for each patient:
 
 ## Dicom tag extraction
 
+Following functions are available to extract relevant image acqusition parameters and some patient characteristics. Tags that are extracte are defined in the [tags_CBCT.txt](./configs/tags_CBCT.txt), [tags_MR.txt](./configs/tags_MR.txt) and [tags_CT.txt](./configs/tags_CT.txt) files.
+
 **read_tags(input_txt)**
 
 	description:
