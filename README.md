@@ -48,6 +48,10 @@ The code is written/tested in Python 3.12.3 The following packages are required 
 - matplotlib
 - csv
 
+For Dicom tag extraction the following packages are required:
+- pydicom 
+- openpyxl
+
 To convert RT structs to .nrrd files plastimatch is required. Plastimatch can be downloaded from [here](https://plastimatch.org/). The path to plastimatch should be added to the system path.
 
 # Usage
