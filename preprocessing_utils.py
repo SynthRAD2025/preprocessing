@@ -614,7 +614,7 @@ def stitch_image(image_inside: sitk.Image, image_outside: sitk.Image, mask: sitk
     """
     image_inside = resample_reference(image_inside,image_outside,default_value=0)
     mask = resample_reference(mask,image_outside,default_value=0)
-    
+    mask = sitk.BinaryErode(mask, (1, 1, 1))
     image_inside_np = sitk.GetArrayFromImage(image_inside)
     mask_np = sitk.GetArrayFromImage(mask)
     image_outside_np = sitk.GetArrayFromImage(image_outside)
@@ -959,7 +959,7 @@ def preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform_def
                 struct_img_orig[face == 1] = 0
             struct_img = crop_image(struct_img_orig,fov_s1)
             struct_img = mask_image(struct_img,fov,0)
-            struct_deformed = warp_structure(struct_img,transform_def)
+            struct_deformed = warp_structure(struct_img_orig,transform_def)
             struct_deformed = mask_image(struct_deformed,fov,0)
             struct_stitched = stitch_image(struct_deformed, struct_img_orig, mask)
         save_image(struct_stitched,os.path.join(output_dir,'structures',struct.split('.')[0]+'_stitched.nrrd'))

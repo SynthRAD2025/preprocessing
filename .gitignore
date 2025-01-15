@@ -18,3 +18,5 @@ stage1_config_full.csv
 .~lock.stage2_config_AB.csv#
 .~lock.stage2_config.csv#
 stage2_config_TH_A.csv
+fix_structure_stitching.py
+
