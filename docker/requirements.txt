@@ -1,0 +1,8 @@
+numpy
+matplotlib
+scipy
+scikit-build
+itk
+SimpleITK-SimpleElastix
+TotalSegmentator
+ipykernel

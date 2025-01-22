@@ -1,0 +1,14 @@
+services:
+  synthrad:
+    build:
+      context: .
+    volumes:
+      - /local/directory:/workspace
+    command: tail -F anything
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 'all'
+            capabilities: [gpu]

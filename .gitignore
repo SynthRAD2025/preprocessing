@@ -19,4 +19,6 @@ stage1_config_full.csv
 .~lock.stage2_config.csv#
 stage2_config_TH_A.csv
 fix_structure_stitching.py
+utilities/download_data_split.py
+utilities/client_secrets.json
 
