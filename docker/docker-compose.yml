@@ -3,7 +3,10 @@ services:
     build:
       context: .
     volumes:
-      - /local/directory:/workspace
+      # path to data directory
+      - /local/directory:/data
+      # path to pre-processing code
+      - ../:/code
     command: tail -F anything
     deploy:
       resources:
