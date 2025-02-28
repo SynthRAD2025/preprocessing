@@ -65,7 +65,10 @@ if __name__ == "__main__":
         if patient['defacing_correction'] == True:
             face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
         
-        #Perform cone correction for fov mask if task2
+        # Clip CT to valid HU range
+        ct = utils.clip_image(ct,-1024,3072)
+        
+        # Perform cone correction for fov mask if task2
         if patient['task'] == 2:
             if patient['cone_correction']:
                 fov_s1 = utils.cone_correction(fov_s1,log=logger)
@@ -116,7 +119,7 @@ if __name__ == "__main__":
         logger.info('Preprocessing and warping structures...')
         rigid_reg = sitk.ReadTransform(os.path.join(patient['output_dir'],'transform.tfm'))
         ct_s1 = utils.read_image(os.path.join(patient['output_dir'],'ct_s1.nii.gz'),log=logger)
-        utils.preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform,mask,log=logger)
+        #utils.preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform,mask,log=logger)
         
         # Stitch CT_def to CT_s1 for planning (structures are stitched above)
         ct_deformed_stitched = utils.stitch_image(ct_deformed, ct_s1, mask)

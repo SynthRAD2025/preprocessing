@@ -247,6 +247,14 @@ def correct_image_properties(input_image:sitk.Image, order=[0,1,2], flip=[False,
         log.info(f'Orientation corrected using order = {order} and flip = {flip}')
     return image
 
+def clip_image(image:sitk.Image,lower_bound:float, upper_bound:float, log=False)->sitk.Image:
+    # clip an image using SimpleITK
+    if log != False:
+        log.info(f'Clipping image between {lower_bound} and {upper_bound}')
+    image[image<lower_bound] = lower_bound
+    image[image>upper_bound] = upper_bound
+    return image
+
 def nib_to_sitk(nib_image) -> sitk.Image:
     """
     Convert a NIfTI image to a SimpleITK image.
@@ -333,7 +341,7 @@ def segment_defacing(ct_image:sitk.Image,structures=['brain','skull'],log=False)
         log.info(f'Brain and skull masks generated for defacing')
     return brain,skull
 
-def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image,log=False)->sitk.Image:
+def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image,version='v1',log=False)->sitk.Image:
     """
     Applies defacing to the brain image based on the brain and skull masks.
 
@@ -362,13 +370,25 @@ def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image,log=False)->sitk.Image
     x_brain = np.nanmin(surface)
     y_brain = np.nanargmin(surface)
 
+    print(x_brain,y_brain)
+    
     # find skull POI
     skull_central = skull_mask_np[:,:,int(dims[2]/2)]
-    coords = np.where(skull_central != 0)
-    bbox = (np.min(coords[0]), np.max(coords[0]), np.min(coords[1]), np.max(coords[1]))
-    x_skull = bbox[2]
-    y_skull = bbox[0]
-
+    if version == 'v1':
+        coords = np.where(skull_central != 0)
+        bbox = (np.min(coords[0]), np.max(coords[0]), np.min(coords[1]), np.max(coords[1]))
+        x_skull = bbox[2]
+        y_skull = bbox[0]
+    
+    if version == 'v2':
+        # different approach to localize mandible
+        # find indices of first non-zero value in the skull_central array
+        nonzero_indices = np.argwhere(skull_central != 0)
+        if nonzero_indices.size > 0:
+            first_nonzero_index = nonzero_indices[0]
+        x_skull = first_nonzero_index[1]
+        y_skull = first_nonzero_index[0]
+    
     # create defacing mask
     k = (y_brain - y_skull)/(x_brain - x_skull)
     d = (y_brain - k*x_brain)
@@ -376,8 +396,15 @@ def defacing(brain_mask:sitk.Image, skull_mask:sitk.Image,log=False)->sitk.Image
     for l in range(dims[2]):
         for i in range(dims[1]):
             for j in range(y_skull,y_brain):
-                if j > k*i + d:
-                    face[j,i,l] = 1
+                if version == 'v1':
+                    if j > k*i + d:
+                        face[j,i,l] = 1
+                elif version == 'v2':
+                    if j > k*i + d and k > 0:
+                        face[j,i,l] = 1
+                    elif j < k*i + d and k < 0:
+                        face[j,i,l] = 1
+
     defacing_mask = sitk.GetImageFromArray(face)
     defacing_mask.CopyInformation(brain_mask)
     defacing_mask = sitk.Cast(defacing_mask, sitk.sitkUInt8)
@@ -444,6 +471,59 @@ def get_cbct_fov(cbct:sitk.Image,background:int=0,log=False)->sitk.Image:
     fov_mask = sitk.Cast(fov_mask,sitk.sitkUInt8)
     if log != False:
         log.info(f'CBCT FOV mask generated using background = {background}')
+    return fov_mask
+
+def get_cbct_fov_v2(cbct:sitk.Image,background:int=0,log=False)->sitk.Image:
+    # find the center and radius of a circular binary mask, allowing off-center positioning
+    cbct_np = sitk.GetArrayFromImage(cbct)
+    cbct_np[cbct_np>background] = 1
+    cbct_np[cbct_np<=background] = 0
+    fov_mask_np = np.zeros(cbct_np.shape)
+    
+    # Store centers and radii for all slices
+    centers = []
+    radii = []
+    
+    # First pass - collect all centers and radii
+    for i in range(cbct_np.shape[0]):
+        slice = cbct_np[i,:,:]
+        if np.any(slice == 1):
+            coords = np.argwhere(slice == 1)
+            if len(coords) > 0:
+                center = np.mean(coords, axis=0)
+                distances = np.sqrt((coords[:,0] - center[0])**2 + (coords[:,1] - center[1])**2)
+                mask_radius = np.max(distances) - 1  # Reduce radius by 1 pixel
+                centers.append(center)
+                radii.append(mask_radius)
+            else:
+                centers.append(None)
+                radii.append(0)
+        else:
+            centers.append(None)
+            radii.append(0)
+    
+    # Smooth the radii using median filter
+    radii = np.array(radii)
+    valid_radii = radii[radii > 0]
+    if len(valid_radii) > 0:
+        median_radius = np.median(valid_radii)
+        # Replace zeros with median value for interpolation
+        radii[radii == 0] = median_radius
+        # Apply median filter to smooth out variations
+        smoothed_radii = ndimage.median_filter(radii, size=5)
+    
+    # Second pass - create masks using smoothed values
+    for i in range(cbct_np.shape[0]):
+        if centers[i] is not None:
+            y, x = np.indices(cbct_np.shape[1:])
+            circle = (y - centers[i][0])**2 + (x - centers[i][1])**2 <= smoothed_radii[i]**2
+            fov_mask_np[i,:,:] = circle
+    
+    fov_mask = sitk.GetImageFromArray(fov_mask_np)
+    fov_mask.CopyInformation(cbct)
+    fov_mask = sitk.Cast(fov_mask,sitk.sitkUInt8)
+    if log != False:
+        log.info(f'CBCT FOV mask v2 generated using background = {background}')
     return fov_mask
 
 def get_mr_fov(mr:sitk.Image)->sitk.Image:
@@ -663,6 +743,29 @@ def resample_image(image, new_spacing=[1.0, 1.0, 1.0],log=False)->sitk.Image:
         log.info(f'Image resampled to new spacing {new_spacing}')
     return resampled_image
 
+def rescale_image(image: sitk.Image, fov: sitk.Image, shift: float, clip: tuple, log=None) -> sitk.Image:
+    """
+    Rescale the given image by shifting and clipping the pixel values.
+
+    Parameters:
+    - image: SimpleITK.Image
+        The input image to be rescaled.
+    - shift: float
+        The shift value to be applied to the pixel values.
+    - clip: tuple
+        The lower and upper bounds used for clipping the pixel values.
+
+    Returns:
+    - rescaled_image: SimpleITK.Image
+        The rescaled image.
+
+    """
+    rescaled_image = image + shift
+    rescaled_image = clip_image(rescaled_image, clip[0], clip[1])
+    rescaled_image[fov==0]=clip[0]
+    if log != None:
+        log.info(f'Image rescaled with shift = {shift} and clip = {clip}')
+    return rescaled_image
 
 
 def cone_correction(fov:sitk.Image,log=None):
@@ -784,12 +887,22 @@ def postprocess_outline(mask:sitk.Image, fov:sitk.Image, dilation_radius:int=10,
     
     if IS_correction != None:
         bbox = get_bounding_box(mask_final)
-        if bbox[2] > 0:
-            bbox[2] = bbox[2]-1
-        if bbox[5] < mask_final.GetSize()[2]-1:
-            bbox[5] = bbox[5]+1
-        mask_final[:,:,bbox[2]:bbox[2]+IS_correction] = 0
-        mask_final[:,:,bbox[5]-IS_correction:bbox[5]] = 0
+        try:
+            if bbox[2] > 0:
+                bbox[2] = bbox[2]-1
+            if bbox[5] <= mask_final.GetSize()[2]-1:
+                bbox[5] = bbox[5]+1
+            mask_final[:,:,bbox[2]:bbox[2]+IS_correction] = 0
+            mask_final[:,:,bbox[5]-IS_correction:bbox[5]] = 0
+        except Exception as e:
+            print(f"Error in IS correction occured: {e}\n fallback to previous implementation" )
+            if bbox[2] > 0:
+                bbox[2] = bbox[2]-1
+            if bbox[5] < mask_final.GetSize()[2]-1:
+                bbox[5] = bbox[5]+1
+            mask_final[:,:,bbox[2]:bbox[2]+IS_correction] = 0
+            mask_final[:,:,bbox[5]-IS_correction:bbox[5]] = 0
+        
     
     if defacing_correction != None:
         defacing_np = sitk.GetArrayFromImage(defacing_correction)
@@ -960,6 +1073,7 @@ def preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform_def
             struct_img = crop_image(struct_img_orig,fov_s1)
             struct_img = mask_image(struct_img,fov,0)
             struct_deformed = warp_structure(struct_img_orig,transform_def)
+            struct_deformed = resample_reference(struct_deformed,fov,0)
             struct_deformed = mask_image(struct_deformed,fov,0)
             struct_stitched = stitch_image(struct_deformed, struct_img_orig, mask)
         save_image(struct_stitched,os.path.join(output_dir,'structures',struct.split('.')[0]+'_stitched.nrrd'))
@@ -1048,6 +1162,103 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
     plt.tight_layout()
     plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
 
+def generate_overview_val_test(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.Image, mask:sitk.Image,patient_dict:dict)->None:
+    """
+    Generate an overview PNG image showing slices from different orientations of the input CT, input image, and mask.
+
+    Parameters:
+    ct (sitk.Image): The CT image.
+    input (sitk.Image): The input image.
+    mask (sitk.Image): The mask image.
+    output_dir (str): The directory to save the overview PNG image.
+
+    Returns:
+    None
+    """
+    
+    shape = np.shape(sitk.GetArrayFromImage(ct))
+    background_ct = np.percentile(sitk.GetArrayFromImage(ct), 0.1)
+    high_ct = np.percentile(sitk.GetArrayFromImage(ct), 99.9)
+    background_input = np.percentile(sitk.GetArrayFromImage(input), 0.1)
+    high_input = np.percentile(sitk.GetArrayFromImage(input), 99.9)
+
+    slice_sag = shape[2]//2
+    slice_cor = shape[1]//2
+    slice_ax = shape[0]//2
+    
+    #calculate final size of figure so minimal white space in figure
+    sag_len = slice_sag*2
+    cor_len = slice_cor*2
+    ax_len = slice_ax*2
+    height_ratios = [cor_len/cor_len,((ax_len*3)/cor_len)*sag_len/cor_len,ax_len*3/cor_len]
+    x_len = (sag_len/cor_len)*5
+    y_len = np.array(height_ratios).sum()/x_len
+    gridspec_kw={'width_ratios':[1,1,1,1,1],'height_ratios':height_ratios}
+    
+    size=20
+    fig,ax = plt.subplots(3,5,figsize=(size,y_len*size),gridspec_kw=gridspec_kw)
+    
+    ax[0,1].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,0].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='gray',vmin=background_input,vmax=high_input)
+    ax[0,0].contour(sitk.GetArrayFromImage(mask)[slice_ax,:,:],levels=[0.5],colors='r')
+    ax[0,3].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,3].imshow(sitk.GetArrayFromImage(ct)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[0,2].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='gray',vmin=background_ct,vmax=high_ct)
+    ax[0,4].imshow(sitk.GetArrayFromImage(input)[slice_ax,:,:],cmap='Reds',alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[0,4].imshow(sitk.GetArrayFromImage(ct_deformed)[slice_ax,:,:],cmap='Blues',alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    ax[1,1].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,0].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[1,0].contour(sitk.GetArrayFromImage(mask)[::-1,:,slice_sag],levels=[0.5],colors='r')
+    ax[1,3].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,3].imshow(sitk.GetArrayFromImage(ct)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)  
+    ax[1,2].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[1,4].imshow(sitk.GetArrayFromImage(input)[::-1,:,slice_sag],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[1,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,:,slice_sag],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    ax[2,1].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,0].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_input,vmax=high_input)
+    ax[2,0].contour(sitk.GetArrayFromImage(mask)[::-1,slice_cor,:],levels=[0.5],colors='r')
+    ax[2,3].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,3].imshow(sitk.GetArrayFromImage(ct)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    ax[2,2].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='gray',aspect=3,vmin=background_ct,vmax=high_ct)
+    ax[2,4].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
+    ax[2,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
+    
+    def add_text(ax,text):
+        props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
+        ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top', bbox=props)
+    
+    def add_patient(ax,text):
+        props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
+        ax.text(0.95, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top',horizontalalignment='right',bbox=props)
+
+    for r,ax_row in enumerate(ax):
+        for c,a in enumerate(ax_row):
+            a.set_xticks([])
+            a.set_yticks([])
+            if c == 0:
+                add_text(a,'Input + Mask')
+                add_patient(a,patient_dict['ID'])
+                a.set_ylabel('Axial' if r == 0 else 'Sagittal' if r == 1 else 'Coronal',fontsize=12,fontweight='bold')
+            if c == 1:
+                add_text(a,'CT')
+                add_patient(a,patient_dict['ID'])
+            if c == 2:
+                add_text(a,'CT def')
+                add_patient(a,patient_dict['ID'])
+            if c == 3:
+                add_text(a,'Overlay')
+                add_patient(a,patient_dict['ID'])
+            if c == 4:
+                add_text(a,'Overlay def')
+                add_patient(a,patient_dict['ID'])
+    
+    fig.subplots_adjust(wspace=0.02,hspace=0.02)
+    plt.tight_layout()
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}_def.png'),dpi=300,bbox_inches='tight')
+
+
 def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.Image, mask:sitk.Image,patient_dict:dict)->None:
     """
     Generate an overview PNG image showing slices from different orientations of the input CT, input image, and mask.
@@ -1111,22 +1322,25 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
     ax[2,4].imshow(sitk.GetArrayFromImage(input)[::-1,slice_cor,:],cmap='Reds',aspect=3,alpha=0.5,vmin=background_input,vmax=high_input)
     ax[2,4].imshow(sitk.GetArrayFromImage(ct_deformed)[::-1,slice_cor,:],cmap='Blues',aspect=3,alpha=0.5,vmin=background_ct,vmax=high_ct)
     
-    structures = os.listdir(os.path.join(patient_dict['output_dir'],'structures'))
-    structures = [i for i in structures if i.endswith('s2_def.nrrd')]
-    colormap = plt.get_cmap('tab20')
-    num_colors = 20
-    colors = [mcolors.rgb2hex(colormap((i / num_colors))) for i in range(num_colors)]
-    lines = [0 for i in range(len(structures))]
-    for i, struct in enumerate(structures):
-        struct = sitk.ReadImage(os.path.join(patient_dict['output_dir'],'structures',struct))
-        struct = sitk.GetArrayFromImage(struct)
-        ax[0,2].contour(struct[slice_ax,:,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
-        ax[1,2].contour(struct[::-1,:,slice_sag],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
-        ax[2,2].contour(struct[::-1,slice_cor,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
-        lines[i]=ax[2,2].plot(0,0,color=colors[i%len(colors)],label='_'.join(structures[i].split('_')[0:-2])[:20])
-    rows=math.ceil(len(structures)/8)
-    fig.legend(loc='lower center',bbox_to_anchor=(0.5, -0.026*rows),ncol=8,fontsize=10)
-
+    try:
+        structures = os.listdir(os.path.join(patient_dict['output_dir'],'structures'))
+        structures = [i for i in structures if i.endswith('s2_def.nrrd')]
+        colormap = plt.get_cmap('tab20')
+        num_colors = 20
+        colors = [mcolors.rgb2hex(colormap((i / num_colors))) for i in range(num_colors)]
+        lines = [0 for i in range(len(structures))]
+        for i, struct in enumerate(structures):
+            struct = sitk.ReadImage(os.path.join(patient_dict['output_dir'],'structures',struct))
+            struct = sitk.GetArrayFromImage(struct)
+            ax[0,2].contour(struct[slice_ax,:,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+            ax[1,2].contour(struct[::-1,:,slice_sag],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+            ax[2,2].contour(struct[::-1,slice_cor,:],alpha=0.5, colors=colors[i%len(colors)],linewidths=0.5)
+            lines[i]=ax[2,2].plot(0,0,color=colors[i%len(colors)],label='_'.join(structures[i].split('_')[0:-2])[:20])
+        rows=math.ceil(len(structures)/8)
+        fig.legend(loc='lower center',bbox_to_anchor=(0.5, -0.026*rows),ncol=8,fontsize=10)
+    except:
+        print('No structures found...')
+    
     def add_text(ax,text):
         props = dict(facecolor='white', alpha=0.9, edgecolor='white', boxstyle='round,pad=0.5')
         ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,verticalalignment='top', bbox=props)

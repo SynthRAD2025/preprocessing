@@ -4,10 +4,11 @@ services:
       context: .
     volumes:
       # path to data directory
-      - /local/directory:/data
+      - /path/to/data/:/data
       # path to pre-processing code
       - ../:/code
     command: tail -F anything
+    shm_size: '2gb'
     deploy:
       resources:
         reservations:
