@@ -1,4 +1,8 @@
-
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![GNU GPL-v3.0][license-shield]][license-url]
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
@@ -179,3 +183,17 @@ Following functions are available to extract relevant image acqusition parameter
 	arguments:
 	input_csv: path to csv file
 	output_xlsx: filepath of output xlsx file
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/
+#reference-style-links -->
+[contributors-shield]: https://img.shields.io/github/contributors/SynthRAD2025/preprocessing.svg?style=flat-square
+[contributors-url]: https://github.com/SynthRAD2025/preprocessing/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/SynthRAD2025/preprocessing.svg?style=flat-square
+[forks-url]: https://github.com/SynthRAD2025/preprocessing/network/members
+[stars-shield]: https://img.shields.io/github/stars/SynthRAD2025/preprocessing.svg?style=flat-square
+[stars-url]: https://github.com/SynthRAD2025/preprocessing/stargazers
+[issues-shield]: https://img.shields.io/github/issues/SynthRAD2025/preprocessing.svg?style=flat-square
+[issues-url]: https://github.com/SynthRAD2025/preprocessing/issues
+[license-shield]: https://img.shields.io/github/license/SynthRAD2025/preprocessing.svg?style=flat-square
+[license-url]: https://github.com/SynthRAD2025/preprocessing/blob/master/LICENSE.txt
