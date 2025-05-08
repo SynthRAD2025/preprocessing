@@ -24,3 +24,10 @@ utilities/client_secrets.json
 local/
 
 utilities/download_parameters.py
+analysis_paper.ipynb
+.gitignore
+asd.csv
+utilities/apply_renaming.ipynb
+utilities/create_preliminary.py
+utilities/find_biggest_array.py
+utilities/padd_preliminary.ipynb

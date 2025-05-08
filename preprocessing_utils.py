@@ -197,7 +197,7 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,
     elastixImageFilter.SetMovingImage(moving)
     if mask != None:
         elastixImageFilter.SetFixedMask(mask)
-    elastixImageFilter.LogToConsoleOff()
+    elastixImageFilter.LogToConsoleOn()
     elastixImageFilter.LogToFileOff()
     elastixImageFilter.SetNumberOfThreads(16)
     elastixImageFilter.Execute()

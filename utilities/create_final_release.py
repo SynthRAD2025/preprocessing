@@ -77,6 +77,7 @@ for center in CENTERS:
                                                 shutil.copy(source_file, destination_file)
                                             else:
                                                 print(f'File {source_file} does not exist')
+                                    
                                     elif file == "ct_s2_def.nii.gz":
                                         source_file = os.path.join(source, patient_id,'output',f'{file}')
                                         file_name = file.replace('_s2_def.nii.gz','_def.mha')
@@ -84,7 +85,24 @@ for center in CENTERS:
                                             os.makedirs(os.path.join(destination,patient_id))
                                         dest_file = os.path.join(destination,patient_id,file_name)
                                         nii_to_mha(source_file, dest_file, compression=True)
-                                        
+                                    
+                                    elif file == "structures_renamed":
+                                        source_dir = os.path.join(source, patient_id,'output','structures_renamed')
+                                        destination_dir = os.path.join(destination,patient_id,'structures_renamed')
+                                        if not os.path.exists(os.path.join(destination,patient_id)):
+                                            os.makedirs(os.path.join(destination,patient_id))
+                                        if os.path.exists(source_dir):
+                                            shutil.copytree(source_dir, destination_dir,dirs_exist_ok=True)
+                                        else:
+                                            print(f'File {source_dir} does not exist')
+                                    
+                                    elif file == "ct_s2_def_stitched.nii.gz":
+                                        source_file = os.path.join(source, patient_id,'output',f'{file}')
+                                        if not os.path.exists(os.path.join(destination,patient_id)):
+                                            os.makedirs(os.path.join(destination,patient_id))
+                                        dest_file = os.path.join(destination,patient_id,file)
+                                        shutil.copy(source_file, dest_file)
+                                    
                                     else:
                                         source_file = os.path.join(source, patient_id,'output',f'{file}')
                                         file_name = file.replace('_s2.nii.gz','.mha')
