@@ -25,7 +25,8 @@ def clip_image(image:sitk.Image,lower_bound:float, upper_bound:float)->sitk.Imag
     image[image>upper_bound] = upper_bound
     return image
 
-### change this path to where data is stored ###
+### change theses path for source (non-clipped) and destination (clipped)  ###
+### use the same path twice if you want to overvwrite the original data    ###
 dataset_root = '/workspace/data/full/releases/non-clipped/'
 dataset_dest_root = '/workspace/data/full/releases/clipped/'
 
@@ -38,7 +39,6 @@ datasets = [
 datasets = os.listdir(dataset_root)
 
 for dataset in datasets:
-    # change this path to where your data is stored
     dataset_path = os.path.join(dataset_root, dataset)
     dataset_dest_path = os.path.join(dataset_dest_root, dataset)
 
