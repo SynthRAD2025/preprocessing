@@ -66,7 +66,7 @@ if __name__ == "__main__":
             face = utils.read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=logger)
         
         # Clip CT to valid HU range
-        ct = utils.clip_image(ct,-1024,3072)
+        ct = utils.clip_image(ct,-1024,3071)
         
         # Perform cone correction for fov mask if task2
         if patient['task'] == 2:

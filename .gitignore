@@ -31,3 +31,4 @@ utilities/apply_renaming.ipynb
 utilities/create_preliminary.py
 utilities/find_biggest_array.py
 utilities/padd_preliminary.ipynb
+utilities/qa_clip.py
