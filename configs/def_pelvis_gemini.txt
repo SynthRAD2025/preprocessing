@@ -1,0 +1,38 @@
+// General settings
+(MaximumNumberOfIterations 500 500 250 100)
+(NumberOfResolutions 4)
+(ImagePyramidSchedule 8 8 8 4 4 4 2 2 2 1 1 1)
+(FixedInternalImagePixelType "float")
+(MovingInternalImagePixelType "float")
+
+// Registration
+(Registration "MultiResolutionRegistration")
+(FixedImagePyramid "FixedRecursiveImagePyramid")
+(MovingImagePyramid "MovingRecursiveImagePyramid")
+(Interpolator "BSplineInterpolator")
+
+// Similarity metric
+(Metric "AdvancedMattesMutualInformation")
+(NumberOfHistogramBins 32)
+
+// Transform
+(Transform "BSplineTransform")
+(TransformParameterFileName "TransformParameters.BSpline.txt")
+(FinalGridSpacingInPhysicalUnits 15 15 15)
+(FinalBSplineInterpolationOrder 3)
+
+// Optimizer
+(Optimizer "AdaptiveStochasticGradientDescent")
+(AutomaticParameterEstimation "true")
+
+// Image sampling
+(ImageSampler "RandomCoordinate")
+(NumberOfSpatialSamples 8092)
+(NewSamplesEveryIteration "true")
+
+// Output settings
+(WriteResultImage "false")
+(ResultImagePixelType "short")
+(DefaultPixelValue -1000)
+(ResampleInterpolator "FinalBSplineInterpolator")
+(Resampler "DefaultResampler")

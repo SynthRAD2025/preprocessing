@@ -1,0 +1,42 @@
+// General settings
+(MaximumNumberOfIterations  1000 500 500 200)
+(NumberOfResolutions        4)
+(ImagePyramidSchedule       8 8 8  4 4 4  2 2 2  1 1 1)
+(Registration              "MultiResolutionRegistration")
+(FixedImagePyramid         "FixedSmoothingImagePyramid")
+(MovingImagePyramid        "MovingSmoothingImagePyramid")
+(Interpolator              "BSplineInterpolator")
+(BSplineElasticSigma 1.5)
+
+// Similarity metric
+(Metric                    "AdvancedMattesMutualInformation")
+(NumberOfHistogramBins    64)
+
+// Transform
+(Transform                 "BSplineTransform")
+(TransformParameterFileName   "TransformParameters.BSpline.txt")
+(FinalGridSpacingInPhysicalUnits 10.0 10.0 10.0)
+(GridSpacingSchedule       8 8 8  4 4 4  2 2 2  1 1 1)
+(FinalBSplineInterpolationOrder 3)
+
+// Optimizer
+(Optimizer                 "AdaptiveStochasticGradientDescent")
+(AutomaticParameterEstimation "true")
+(MaximumStepLength        1.0)
+(MinimumStepLength        0.001)
+(NumberOfSpatialSamples   50000)
+(NewSamplesEveryIteration "true")
+
+// Image sampling
+(ImageSampler "RandomCoordinate")
+
+// Output settings
+(WriteResultImage         "false")
+(ResultImagePixelType     "short")
+
+(DefaultPixelValue        -1000)
+(ResampleInterpolator     "FinalBSplineInterpolator")
+(Resampler                "DefaultResampler")
+
+// Logging
+(WriteTransformParametersEachIteration "false")

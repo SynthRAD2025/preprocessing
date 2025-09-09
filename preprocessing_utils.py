@@ -164,7 +164,7 @@ def rigid_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask
     
     return registered_image,inverse_transform
 
-def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value=0, log=False)->Union[sitk.Image,sitk.Transform]:
+def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file, mask=None, default_value=0, log=False, rigidity_mask=True)->Union[sitk.Image,sitk.Transform]:
     """
     Perform deformable registration between a fixed image and a moving image using the specified parameter file.
 
@@ -183,25 +183,36 @@ def deformable_registration(fixed:sitk.Image, moving:sitk.Image, parameter_file,
     
     if log != False:
         log.info(f'Starting deformable registration using parameter file {parameter_file}')
-        
+    
     temp_dir = tempfile.mkdtemp()
     current_directory = os.getcwd()
     os.chdir(temp_dir)
 
+    if rigidity_mask:
+        # threshold the ct image to get a bone mask
+        bone_mask = sitk.BinaryThreshold(moving, lowerThreshold=150, upperThreshold=3000, insideValue=1, outsideValue=0)
+        save_image(bone_mask, './bone_mask_ct.nii.gz')
+    
     parameter = sitk.ReadParameterFile(parameter_file)
 
     # Perform registration based on parameter file
     elastixImageFilter = sitk.ElastixImageFilter()
     elastixImageFilter.SetParameterMap(parameter)
-    elastixImageFilter.SetFixedImage(fixed)  # due to FOV differences CT first registered to MR an inverted in the end
+    elastixImageFilter.SetFixedImage(fixed)
     elastixImageFilter.SetMovingImage(moving)
+    if rigidity_mask:
+        elastixImageFilter.SetParameter('Registration','MultiMetricMultiResolutionRegistration')
+        elastixImageFilter.SetParameter('Metric', ['AdvancedMattesMutualInformation','TransformRigidityPenalty'])
+        elastixImageFilter.SetParameter('Metric0Weight', '1')
+        elastixImageFilter.SetParameter('Metric1Weight', '1')
+        elastixImageFilter.SetParameter('MovingRigidityImageName', './bone_mask_ct.nii.gz')
     if mask != None:
         elastixImageFilter.SetFixedMask(mask)
+    print(elastixImageFilter.GetParameterMap()[0])
     elastixImageFilter.LogToConsoleOn()
     elastixImageFilter.LogToFileOff()
     elastixImageFilter.SetNumberOfThreads(16)
     elastixImageFilter.Execute()
-    
     moving_def = elastixImageFilter.GetResultImage()
     transform = elastixImageFilter.GetTransformParameterMap()[0]
     
@@ -968,6 +979,39 @@ def crop_image(image:sitk.Image, mask:sitk.Image, margin:int=20) -> sitk.Image:
     
     return image_cropped
 
+def normalize_image(image:sitk.Image, log=None)->sitk.Image:
+    """
+    Normalize the input image to have zero mean and unit variance.
+
+    Args:
+        image (sitk.Image): The input image to be normalized.
+        log (bool, optional): Whether to log the normalization process. Defaults to None.
+
+    Returns:
+        sitk.Image: The normalized image.
+    """
+    # Convert the image to a numpy array
+    image_np = sitk.GetArrayFromImage(image)
+    
+    # Calculate mean and standard deviation
+    mean = np.mean(image_np)
+    std = np.std(image_np)
+    
+    # Normalize the image
+    if std > 0:
+        normalized_np = (image_np - mean) / std
+    else:
+        normalized_np = image_np - mean  # Avoid division by zero
+    
+    # Convert back to SimpleITK Image
+    normalized_image = sitk.GetImageFromArray(normalized_np)
+    normalized_image.CopyInformation(image)
+    
+    if log != False:
+        log.info(f'Image normalized with mean = {mean}, std = {std}')
+    
+    return normalized_image
+
 def warp_structure(structure:sitk.Image,transform):
     """
     Warps the structures with the transform generater by the deformable image registration.
@@ -1040,7 +1084,11 @@ def preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform_def
     invert = patient['invert_structures']
     
     #make list of all relevant structures
-    structures = os.listdir(os.path.join(output_dir,'structures'))
+    structure_dir = output_dir.split('/')
+    structure_dir = '/'.join(structure_dir[:-1])
+    print(structure_dir)
+    structures = os.listdir(os.path.join(structure_dir,'structures'))
+    print(structures)
     structures = [struct for struct in structures if 
                     struct.endswith('.nrrd') or 
                     struct.endswith('.nii') or 
@@ -1055,7 +1103,7 @@ def preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform_def
             face = read_image(os.path.join(patient['output_dir'],'defacing_mask.nii.gz'),log=log)
     #pre-process each structure
     for struct in structures:
-        struct_path = os.path.join(output_dir,'structures',struct)
+        struct_path = os.path.join(structure_dir,'structures',struct)
         struct_img = read_image(struct_path,log=log)
         struct_img_orig = resample_reference(struct_img,ct_s1)
         if invert:
@@ -1076,6 +1124,8 @@ def preprocess_structures(patient,input,ct_s1,fov_s1,fov,rigid_reg,transform_def
             struct_deformed = resample_reference(struct_deformed,fov,0)
             struct_deformed = mask_image(struct_deformed,fov,0)
             struct_stitched = stitch_image(struct_deformed, struct_img_orig, mask)
+        if os.path.exists(os.path.join(output_dir,'structures')) == False:
+            os.makedirs(os.path.join(output_dir,'structures'))
         save_image(struct_stitched,os.path.join(output_dir,'structures',struct.split('.')[0]+'_stitched.nrrd'))
         save_image(struct_img,os.path.join(output_dir,'structures',struct.split('.')[0]+'_s2.nrrd'))
         save_image(struct_deformed,os.path.join(output_dir,'structures',struct.split('.')[0]+'_s2_def.nrrd'))
@@ -1160,7 +1210,7 @@ def generate_overview_png(ct:sitk.Image,input:sitk.Image,mask:sitk.Image,patient
     
     fig.subplots_adjust(wspace=0.02,hspace=0.02)
     plt.tight_layout()
-    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}.png'),dpi=300,bbox_inches='tight')
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict["ID"]}.png'),dpi=300,bbox_inches='tight')
 
 def generate_overview_val_test(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.Image, mask:sitk.Image,patient_dict:dict)->None:
     """
@@ -1256,7 +1306,7 @@ def generate_overview_val_test(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
     
     fig.subplots_adjust(wspace=0.02,hspace=0.02)
     plt.tight_layout()
-    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}_def.png'),dpi=300,bbox_inches='tight')
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict["ID"]}_def.png'),dpi=300,bbox_inches='tight')
 
 
 def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.Image, mask:sitk.Image,patient_dict:dict)->None:
@@ -1372,7 +1422,7 @@ def generate_overview_planning(ct:sitk.Image,input:sitk.Image,ct_deformed:sitk.I
     
     fig.subplots_adjust(wspace=0.02,hspace=0.02)
     plt.tight_layout()
-    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict['ID']}_planning.png'),dpi=300,bbox_inches='tight')
+    plt.savefig(os.path.join(patient_dict['output_dir'],f'{patient_dict["ID"]}_planning.png'),dpi=300,bbox_inches='tight')
 
 def generate_overview_stage1(ct:sitk.Image,input:sitk.Image,output_dir:str)->None:
     """

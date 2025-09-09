@@ -4,7 +4,8 @@ services:
       context: .
     volumes:
       # path to data directory
-      - /path/to/data/:/data
+      # - /project_data_2/cbct/autoseg/data/:/data_full
+      - /train_data/athummerer/autoseg/:/data_full
       # path to pre-processing code
       - ../:/code
     command: tail -F anything
